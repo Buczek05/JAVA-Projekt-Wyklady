@@ -1,0 +1,53 @@
+package pl.pk.citysim.model;
+
+/**
+ * Enum representing different types of events that can occur in the city.
+ */
+public enum Event {
+    FIRE("Fire", "A building caught fire, causing damage and repair costs.", false),
+    EPIDEMIC("Epidemic", "A disease outbreak affected families and required healthcare expenses.", false),
+    ECONOMIC_CRISIS("Economic Crisis", "Market instability caused financial losses.", false),
+    GRANT("Grant", "The city received a financial grant from the government.", true);
+
+    private final String name;
+    private final String description;
+    private final boolean positive;
+
+    Event(String name, String description, boolean positive) {
+        this.name = name;
+        this.description = description;
+        this.positive = positive;
+    }
+
+    /**
+     * Gets the name of the event.
+     *
+     * @return The event name
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Gets the description of the event.
+     *
+     * @return The event description
+     */
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Checks if this is a positive event.
+     *
+     * @return true if this is a positive event, false otherwise
+     */
+    public boolean isPositive() {
+        return positive;
+    }
+
+    @Override
+    public String toString() {
+        return name;
+    }
+}
