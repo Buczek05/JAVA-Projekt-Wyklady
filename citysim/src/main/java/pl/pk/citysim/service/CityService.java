@@ -1,8 +1,9 @@
 package pl.pk.citysim.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 import pl.pk.citysim.model.Building;
+import pl.pk.citysim.model.Highscore;
 import pl.pk.citysim.model.BuildingType;
 import pl.pk.citysim.model.City;
 import pl.pk.citysim.model.GameConfig;
@@ -19,7 +20,7 @@ import java.util.Map;
  * Service for managing the city simulation.
  */
 public class CityService {
-    private static final Logger logger = LoggerFactory.getLogger(CityService.class);
+    private static final Logger logger = Logger.getLogger(CityService.class.getName());
 
     private final City city;
     private final GameConfig config;
@@ -34,11 +35,13 @@ public class CityService {
         city.setVatRate(config.getInitialVatRate());
 
         String modeInfo = config.isSandboxMode() ? " (SANDBOX MODE)" : "";
-        logger.info("City initialized with {} families, ${} budget, {}% income tax, and {}% VAT{}", 
-                config.getEffectiveInitialFamilies(), config.getEffectiveInitialBudget(),
-                String.format("%.1f", config.getInitialTaxRate() * 100),
-                String.format("%.1f", config.getInitialVatRate() * 100),
-                modeInfo);
+        logger.log(Level.INFO, String.format(
+                "City initialized with %d families, $%d budget, %.1f%% income tax, and %.1f%% VAT%s", 
+                config.getEffectiveInitialFamilies(), 
+                config.getEffectiveInitialBudget(),
+                config.getInitialTaxRate() * 100,
+                config.getInitialVatRate() * 100,
+                modeInfo));
     }
 
     /**
@@ -48,14 +51,15 @@ public class CityService {
      */
     public boolean cityTick() {
         city.nextDay();
-        logger.debug("Day {}: {} families, {} budget, {} satisfaction", 
-                city.getDay(), city.getFamilies(), city.getBudget(), city.getSatisfaction());
+        logger.log(Level.FINE, String.format(
+                "Day %d: %d families, %d budget, %d satisfaction", 
+                city.getDay(), city.getFamilies(), city.getBudget(), city.getSatisfaction()));
 
         // Check for game over conditions (only if not in sandbox mode)
         if (!config.isSandboxMode()) {
             // Bankruptcy check
             if (city.getBudget() < 0) {
-                logger.info("Game over: City went bankrupt with ${} debt", -city.getBudget());
+                logger.log(Level.INFO, String.format("Game over: City went bankrupt with $%d debt", -city.getBudget()));
                 return false;
             }
 
@@ -86,19 +90,20 @@ public class CityService {
      */
     public boolean buildBuilding(BuildingType buildingType) {
         if (buildingType == null) {
-            logger.warn("Cannot build null building type");
+            logger.log(Level.WARNING, "Cannot build null building type");
             return false;
         }
 
         int cost = buildingType.getUpkeep() * 10; // Initial cost is 10x the upkeep
         if (city.getBudget() < cost) {
-            logger.info("Not enough budget to build {}: need {}, have {}", 
-                    buildingType, cost, city.getBudget());
+            logger.log(Level.INFO, String.format(
+                    "Not enough budget to build %s: need %d, have %d", 
+                    buildingType, cost, city.getBudget()));
             return false;
         }
 
         Building building = city.addBuilding(buildingType);
-        logger.info("Built new {} (ID: {})", buildingType, building.getId());
+        logger.log(Level.INFO, String.format("Built new %s (ID: %d)", buildingType, building.getId()));
         return true;
     }
 
@@ -110,9 +115,10 @@ public class CityService {
     public void setTaxRate(double taxRate) {
         double oldRate = city.getTaxRate();
         city.setTaxRate(taxRate);
-        logger.info("Income tax rate changed from {}% to {}%", 
-                String.format("%.2f", oldRate * 100), 
-                String.format("%.2f", city.getTaxRate() * 100));
+        logger.log(Level.INFO, String.format(
+                "Income tax rate changed from %.2f%% to %.2f%%", 
+                oldRate * 100, 
+                city.getTaxRate() * 100));
     }
 
     /**
@@ -123,9 +129,10 @@ public class CityService {
     public void setVatRate(double vatRate) {
         double oldRate = city.getVatRate();
         city.setVatRate(vatRate);
-        logger.info("VAT rate changed from {}% to {}%", 
-                String.format("%.2f", oldRate * 100), 
-                String.format("%.2f", city.getVatRate() * 100));
+        logger.log(Level.INFO, String.format(
+                "VAT rate changed from %.2f%% to %.2f%%", 
+                oldRate * 100, 
+                city.getVatRate() * 100));
     }
 
     /**
@@ -170,10 +177,10 @@ public class CityService {
 
         // Get rank
         int rank = Highscore.getRank(score);
-        if (rank > 0 && rank <= Highscore.MAX_HIGHSCORES) {
+        if (rank > 0 && rank <= 10) {
             stats.put("Highscore Rank", "#" + rank);
         } else {
-            stats.put("Highscore Rank", "Not in top " + Highscore.MAX_HIGHSCORES);
+            stats.put("Highscore Rank", "Not in top 10");
         }
 
         summary.append(pl.pk.citysim.ui.ConsoleFormatter.createKeyValueTable("FINAL STATISTICS", stats));
@@ -470,10 +477,10 @@ public class CityService {
         try {
             GameState gameState = new GameState(city);
             gameState.saveToFile(filename);
-            logger.info("Game saved to {}", filename);
+            logger.log(Level.INFO, String.format("Game saved to %s", filename));
             return true;
         } catch (IOException e) {
-            logger.error("Failed to save game to {}", filename, e);
+            logger.log(Level.SEVERE, String.format("Failed to save game to %s", filename), e);
             return false;
         }
     }
@@ -488,13 +495,13 @@ public class CityService {
         try {
             GameState gameState = GameState.loadFromFile(filename);
             replaceCity(gameState.getCity());
-            logger.info("Game loaded from {}", filename);
+            logger.log(Level.INFO, String.format("Game loaded from %s", filename));
             return true;
         } catch (IOException e) {
-            logger.error("Failed to load game from {}", filename, e);
+            logger.log(Level.SEVERE, String.format("Failed to load game from %s", filename), e);
             return false;
         } catch (Exception e) {
-            logger.error("Failed to replace city after loading game", e);
+            logger.log(Level.SEVERE, "Failed to replace city after loading game", e);
             return false;
         }
     }
@@ -542,10 +549,11 @@ public class CityService {
             // Replace the city
             cityField.set(this, newCity);
 
-            logger.info("City replaced with loaded city (day: {}, families: {}, budget: {})",
-                    newCity.getDay(), newCity.getFamilies(), newCity.getBudget());
+            logger.log(Level.INFO, String.format(
+                    "City replaced with loaded city (day: %d, families: %d, budget: %d)",
+                    newCity.getDay(), newCity.getFamilies(), newCity.getBudget()));
         } catch (Exception e) {
-            logger.error("Failed to replace city", e);
+            logger.log(Level.SEVERE, "Failed to replace city", e);
             throw new Exception("Failed to replace city: " + e.getMessage(), e);
         }
     }

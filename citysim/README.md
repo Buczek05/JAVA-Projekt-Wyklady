@@ -59,7 +59,15 @@ This will create a fat JAR file named `citysim-fat.jar` in the `target` director
 
 ## Running the Game
 
-To run the game, use:
+You can run the game using the provided shell script:
+
+```bash
+./run_citysim.sh
+```
+
+This script will check if Java is installed, build the project if needed, and run the game.
+
+Alternatively, you can run the game directly with:
 
 ```bash
 java -jar target/citysim-fat.jar
@@ -104,6 +112,9 @@ The game features a real-time display that automatically refreshes the screen wi
 
 ### Interface
 - `display <pause|resume>` - Pauses or resumes the real-time display
+- `pause` - Pauses the game simulation (city data does not update)
+- `resume` - Resumes the game simulation after it has been paused
+- `continue` - Resumes the game simulation (alias for 'resume')
 - `help` - Displays general help information
 - `help <command>` - Displays detailed help for a specific command
 - `colors <on|off>` - Enables or disables colored output
@@ -149,6 +160,33 @@ You can set the game difficulty in the config file:
 - `EASY`: More income, fewer expenses
 - `NORMAL`: Balanced gameplay
 - `HARD`: Less income, more expenses
+
+## Pause & Resume Functionality
+
+The game allows you to pause and resume the simulation at any time:
+
+- The game automatically pauses when you enter any command
+- When paused, the city data does not update and random events do not trigger
+- The UI displays "*** GAME PAUSED ***" when the game is paused
+- All commands remain available during pause, allowing you to check statistics or save the game
+- The game automatically pauses briefly during loading to ensure data consistency
+- You can resume the game by typing 'continue' or 'resume'
+
+Example usage:
+```
+> build RESIDENTIAL
+Game paused. Enter commands. Type 'continue' to resume.
+SUCCESS: Built a new Residential Building
+Initial cost: $100
+Daily upkeep: $10
+
+> stats
+*** GAME PAUSED ***
+[City statistics will be displayed...]
+
+> continue
+Game resumed.
+```
 
 ## Save & Load Functionality
 

@@ -30,7 +30,7 @@ public class ConsoleFormatter {
     private static final String ANSI_BOLD = "\u001B[1m";
 
     // Flag to enable/disable ANSI colors
-    private static boolean useColors = false;
+    private static boolean useColors = true;
 
     /**
      * Creates a section header with a title.
@@ -44,7 +44,7 @@ public class ConsoleFormatter {
         int lineLength = 60;
         int titleLength = paddedTitle.length();
         int sideLength = (lineLength - titleLength) / 2;
-        
+
         sb.append("\n");
         sb.append("=".repeat(sideLength));
         sb.append(useColors ? ANSI_BOLD : "");
@@ -52,7 +52,7 @@ public class ConsoleFormatter {
         sb.append(useColors ? ANSI_RESET : "");
         sb.append("=".repeat(lineLength - sideLength - titleLength));
         sb.append("\n");
-        
+
         return sb.toString();
     }
 

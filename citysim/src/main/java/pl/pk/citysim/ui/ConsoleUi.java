@@ -1,9 +1,10 @@
 package pl.pk.citysim.ui;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 import pl.pk.citysim.engine.GameLoop;
 import pl.pk.citysim.model.BuildingType;
+import pl.pk.citysim.model.Highscore;
 import pl.pk.citysim.service.CityService;
 
 import java.util.ArrayList;
@@ -20,7 +21,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Console user interface for the city simulation game.
  */
 public class ConsoleUi {
-    private static final Logger logger = LoggerFactory.getLogger(ConsoleUi.class);
+    private static final Logger logger = Logger.getLogger(ConsoleUi.class.getName());
+    private static final int MAX_HIGHSCORES = 10; // Same value as in Highscore class
     private static final int DISPLAY_REFRESH_INTERVAL_MS = 1000; // 1 second refresh interval
 
     private final CityService cityService;
@@ -78,6 +80,9 @@ public class ConsoleUi {
             System.out.println("  display <pause|resume>     - Pause/resume real-time display");
             System.out.println("  exit                       - Exit the game");
             System.out.println();
+            System.out.println(ConsoleFormatter.highlightInfo("Game is running in the background. Press any key to pause."));
+            System.out.println(ConsoleFormatter.highlightInfo("Type 'continue' to resume after pausing."));
+            System.out.println();
 
             // Start command processor thread
             Thread processorThread = new Thread(this::processCommands);
@@ -87,20 +92,64 @@ public class ConsoleUi {
             // Start real-time display
             startDisplay();
 
+            // Start key listener thread to pause on any key press
+            Thread keyListenerThread = new Thread(this::listenForKeyPress);
+            keyListenerThread.setDaemon(true);
+            keyListenerThread.start();
+
             // Main input loop
             while (running.get()) {
-                System.out.print("> ");
                 String input = scanner.nextLine().trim();
 
-                if (!input.isEmpty()) {
+                // If the game is not paused and input is received, pause the game
+                if (!gameLoop.isPaused() && !input.isEmpty() && !input.equalsIgnoreCase("continue") && !input.equalsIgnoreCase("resume")) {
+                    // Pause the game first
+                    gameLoop.pause();
+                    System.out.println(ConsoleFormatter.highlightInfo("Game paused. Enter commands. Type 'continue' to resume."));
+
+                    // Then process the command
                     try {
                         parseCommand(input);
                     } catch (Exception e) {
                         System.out.println("Error processing command: " + e.getMessage());
-                        logger.error("Error processing command: {}", input, e);
+                        logger.log(Level.SEVERE, "Error processing command: " + input, e);
+                    }
+                } else if (!input.isEmpty()) {
+                    try {
+                        parseCommand(input);
+                    } catch (Exception e) {
+                        System.out.println("Error processing command: " + e.getMessage());
+                        logger.log(Level.SEVERE, "Error processing command: " + input, e);
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Listens for any key press to pause the game.
+     */
+    private void listenForKeyPress() {
+        try {
+            while (running.get()) {
+                if (System.in.available() > 0 && !gameLoop.isPaused()) {
+                    // Pause the game
+                    gameLoop.pause();
+                    System.out.println(ConsoleFormatter.highlightInfo("Game paused. Enter commands. Type 'continue' to resume."));
+                    System.out.print("> ");
+
+                    // Display full city statistics
+                    String cityStats = cityService.getCityStats();
+                    System.out.println(cityStats);
+
+                    // Consume the key press
+                    System.in.read();
+                    Thread.sleep(100);
+                }
+                Thread.sleep(100);
+            }
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error in key listener thread", e);
         }
     }
 
@@ -117,7 +166,7 @@ public class ConsoleUi {
      */
     private void startDisplay() {
         if (displayRunning.compareAndSet(false, true)) {
-            logger.info("Starting real-time display with refresh interval of {} ms", DISPLAY_REFRESH_INTERVAL_MS);
+            logger.log(Level.INFO, String.format("Starting real-time display with refresh interval of %d ms", DISPLAY_REFRESH_INTERVAL_MS));
 
             // Schedule periodic display updates
             displayScheduler.scheduleAtFixedRate(
@@ -216,13 +265,20 @@ public class ConsoleUi {
 
                 // Display city stats
                 String cityStats = cityService.getCityStats();
+
+                // Add pause indicator if game is paused
+                if (gameLoop.isPaused()) {
+                    System.out.println(ConsoleFormatter.highlightInfo("*** GAME PAUSED ***"));
+                }
+
                 System.out.println(cityStats);
 
                 // Show input prompt
                 System.out.print("> ");
+                System.out.flush(); // Ensure prompt is displayed immediately
             }
         } catch (Exception e) {
-            logger.error("Error refreshing display", e);
+            logger.log(Level.SEVERE, "Error refreshing display", e);
         }
     }
 
@@ -242,10 +298,7 @@ public class ConsoleUi {
         // If waiting for player name for highscore, handle that specially
         if (waitingForPlayerName) {
             waitingForPlayerName = false;
-            String playerName = input.trim();
-            if (playerName.isEmpty()) {
-                playerName = "Anonymous";
-            }
+            final String playerName = input.trim().isEmpty() ? "Anonymous" : input.trim();
 
             commandQueue.add(() -> {
                 boolean success = cityService.saveHighscore(playerName);
@@ -544,10 +597,31 @@ public class ConsoleUi {
                 });
                 break;
 
+            case "pause":
+                commandQueue.add(() -> {
+                    if (gameLoop.pause()) {
+                        System.out.println(ConsoleFormatter.highlightInfo("Game paused. Type 'resume' to continue."));
+                    } else {
+                        System.out.println(ConsoleFormatter.highlightInfo("Game is already paused."));
+                    }
+                });
+                break;
+
+            case "resume":
+            case "continue":
+                commandQueue.add(() -> {
+                    if (gameLoop.resume()) {
+                        System.out.println(ConsoleFormatter.highlightInfo("Game resumed."));
+                    } else {
+                        System.out.println(ConsoleFormatter.highlightInfo("Game is not paused."));
+                    }
+                });
+                break;
+
             default:
                 System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown command: " + command));
                 System.out.println(ConsoleFormatter.createDivider());
-                System.out.println("Available commands: build, tax, stats, log, highscore, save, load, help, colors, exit");
+                System.out.println("Available commands: build, tax, stats, log, highscore, save, load, help, colors, pause, resume, continue, exit");
                 System.out.println("Type 'help' for more information about commands.");
                 break;
         }
@@ -666,6 +740,9 @@ public class ConsoleUi {
 
             System.out.println(ConsoleFormatter.highlightInfo("INTERFACE COMMANDS:"));
             System.out.println("  display <pause|resume>      - Pause/resume real-time display");
+            System.out.println("  pause                       - Pause the game simulation");
+            System.out.println("  resume                      - Resume the game simulation");
+            System.out.println("  continue                    - Resume the game simulation (alias for 'resume')");
             System.out.println("  help [command]              - Display help information");
             System.out.println("  colors <on|off>             - Enable/disable colored output");
             System.out.println("  exit                        - Exit the game");
@@ -786,6 +863,33 @@ public class ConsoleUi {
                     System.out.println("Exits the game. Any unsaved progress will be lost.");
                     break;
 
+                case "pause":
+                    System.out.println(ConsoleFormatter.createHeader("PAUSE COMMAND HELP"));
+                    System.out.println("Usage: pause");
+                    System.out.println();
+                    System.out.println("Pauses the game simulation. While paused:");
+                    System.out.println("  - City data does not update");
+                    System.out.println("  - Random events do not trigger");
+                    System.out.println("  - Time does not progress");
+                    System.out.println();
+                    System.out.println("Note: The game automatically pauses when you enter any command.");
+                    System.out.println("The UI will display '*** GAME PAUSED ***' when the game is paused.");
+                    System.out.println("Type 'continue' or 'resume' to continue the game.");
+                    break;
+
+                case "resume":
+                case "continue":
+                    System.out.println(ConsoleFormatter.createHeader("RESUME/CONTINUE COMMAND HELP"));
+                    System.out.println("Usage: resume");
+                    System.out.println("   or: continue");
+                    System.out.println();
+                    System.out.println("Resumes the game simulation after it has been paused.");
+                    System.out.println("This command has no effect if the game is not currently paused.");
+                    System.out.println();
+                    System.out.println("Note: The game automatically pauses when you enter any command.");
+                    System.out.println("Use this command to resume real-time simulation.");
+                    break;
+
                 case "help":
                     System.out.println(ConsoleFormatter.createHeader("HELP COMMAND HELP"));
                     System.out.println("Usage: help [command]");
@@ -845,7 +949,7 @@ public class ConsoleUi {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                logger.error("Error executing command", e);
+                logger.log(Level.SEVERE, "Error executing command", e);
             }
         }
     }
@@ -905,10 +1009,10 @@ public class ConsoleUi {
             System.out.println(ConsoleFormatter.createDivider());
             System.out.println("Your current score: " + currentScore);
 
-            if (rank > 0 && rank <= Highscore.MAX_HIGHSCORES) {
+            if (rank > 0 && rank <= 10) {
                 System.out.println("Current rank: #" + rank + " (would make the highscore table)");
             } else {
-                System.out.println("Current rank: Not in top " + Highscore.MAX_HIGHSCORES);
+                System.out.println("Current rank: Not in top 10");
             }
         } else {
             System.out.println(ConsoleFormatter.createDivider());
@@ -931,14 +1035,13 @@ public class ConsoleUi {
                 int score = cityService.calculateScore();
                 int rank = Highscore.getRank(score);
 
-                if (rank > 0 && rank <= Highscore.MAX_HIGHSCORES) {
+                if (rank > 0 && rank <= 10) {
                     System.out.println(ConsoleFormatter.highlightSuccess(
                         "Congratulations! Your score of " + score + " ranks #" + rank + " on the highscore table!"));
                     System.out.println("Enter your name for the highscore table:");
                     waitingForPlayerName = true;
                 } else {
-                    System.out.println("Your score of " + score + " did not make the top " + 
-                            Highscore.MAX_HIGHSCORES + " highscore table.");
+                    System.out.println("Your score of " + score + " did not make the top 10 highscore table.");
                     System.out.println("Type 'exit' to quit or start a new game.");
                 }
             } else {

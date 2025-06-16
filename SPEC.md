@@ -92,6 +92,23 @@
 - Some buildings (like hospitals) can mitigate negative event effects
 - All events are logged and can be viewed with the `log` command
 
+## Pause & Resume Functionality
+- The game automatically pauses when any command is entered
+- The game can also be paused explicitly using the 'pause' command
+- When paused:
+  - City data does not update
+  - Random events do not trigger
+  - Time does not progress
+  - The UI displays "*** GAME PAUSED ***" to indicate the paused state
+- All commands remain available during pause, allowing players to:
+  - Check statistics and logs
+  - Save the game
+  - Plan their next moves
+- The game can be resumed using the 'continue' or 'resume' command
+- The game automatically pauses briefly during loading to ensure data consistency
+- Pause state is clearly indicated in the UI to avoid confusion
+- Commands that don't make sense during pause still work but have no effect until resumed
+
 ## Save & Load Functionality
 - The game state can be saved to a file and loaded later
 - Saved games are stored in JSON format in a 'saves' directory
@@ -149,12 +166,18 @@ The game supports the following commands:
 12. `display <pause|resume>` - Controls the real-time display
     - `display pause` - Temporarily stops the automatic screen refresh
     - `display resume` - Restarts the automatic screen refresh
-13. `help` - Displays general help information about all commands
-14. `help <command>` - Displays detailed help for a specific command
+13. `pause` - Pauses the game simulation
+    - Stops city data updates and random events
+    - Shows "*** GAME PAUSED ***" in the UI
+    - All commands remain available during pause
+14. `resume` - Resumes the game simulation after it has been paused
+    - Continues city data updates and random events
+15. `help` - Displays general help information about all commands
+16. `help <command>` - Displays detailed help for a specific command
     - Includes usage, description, examples, and parameters
-15. `colors <on|off>` - Enables or disables colored output
+17. `colors <on|off>` - Enables or disables colored output
     - Makes the interface more readable with color-coded information
-16. `exit` - Exits the game
+18. `exit` - Exits the game
 
 ## Stats Display
 The stats command shows:
@@ -194,7 +217,9 @@ When the game ends, a summary is displayed showing:
   - Automatically refreshes the screen with current city stats (every 1 second by default)
   - Critical status changes are highlighted in real-time
   - Input prompt remains responsive during updates
-  - Pause/resume functionality for when detailed reading is needed
+  - Display pause/resume functionality for when detailed reading is needed
+  - Game pause/resume functionality to stop simulation updates while maintaining UI responsiveness
+  - Clear "*** GAME PAUSED ***" indicator when the game is paused
   - Cross-platform compatibility with fallback options for terminals without ANSI support
 - Console output is formatted for clarity and readability:
   - Tables with borders for structured data presentation
