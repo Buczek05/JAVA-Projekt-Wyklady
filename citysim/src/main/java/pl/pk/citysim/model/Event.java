@@ -19,29 +19,14 @@ public enum Event {
         this.positive = positive;
     }
 
-    /**
-     * Gets the name of the event.
-     *
-     * @return The event name
-     */
     public String getName() {
         return name;
     }
 
-    /**
-     * Gets the description of the event.
-     *
-     * @return The event description
-     */
     public String getDescription() {
         return description;
     }
 
-    /**
-     * Checks if this is a positive event.
-     *
-     * @return true if this is a positive event, false otherwise
-     */
     public boolean isPositive() {
         return positive;
     }

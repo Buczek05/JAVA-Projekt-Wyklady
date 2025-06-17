@@ -8,6 +8,13 @@ import pl.pk.citysim.model.BuildingType;
 import pl.pk.citysim.model.City;
 import pl.pk.citysim.model.GameConfig;
 import pl.pk.citysim.model.GameState;
+import pl.pk.citysim.model.ResidentialBuilding;
+import pl.pk.citysim.model.CommercialBuilding;
+import pl.pk.citysim.model.IndustrialBuilding;
+import pl.pk.citysim.model.SchoolBuilding;
+import pl.pk.citysim.model.HospitalBuilding;
+import pl.pk.citysim.model.WaterPlantBuilding;
+import pl.pk.citysim.model.PowerPlantBuilding;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -452,21 +459,20 @@ public class CityService {
         int powerCapacity = 0;
 
         for (Building building : city.getBuildings()) {
-            BuildingType type = building.getType();
-            if (type == BuildingType.RESIDENTIAL) {
+            if (building instanceof ResidentialBuilding) {
                 residentialCapacity += building.getCapacity();
-            } else if (type == BuildingType.COMMERCIAL) {
+            } else if (building instanceof CommercialBuilding) {
                 commercialCapacity += building.getCapacity();
-            } else if (type == BuildingType.INDUSTRIAL) {
+            } else if (building instanceof IndustrialBuilding) {
                 industrialCapacity += building.getCapacity();
-            } else if (type == BuildingType.SCHOOL) {
-                educationCapacity += type.getEducationCapacity();
-            } else if (type == BuildingType.HOSPITAL) {
-                healthcareCapacity += type.getHealthcareCapacity();
-            } else if (type == BuildingType.WATER_PLANT) {
-                waterCapacity += type.getUtilityCapacity();
-            } else if (type == BuildingType.POWER_PLANT) {
-                powerCapacity += type.getUtilityCapacity();
+            } else if (building instanceof SchoolBuilding) {
+                educationCapacity += building.getEducationCapacity();
+            } else if (building instanceof HospitalBuilding) {
+                healthcareCapacity += building.getHealthcareCapacity();
+            } else if (building instanceof WaterPlantBuilding) {
+                waterCapacity += building.getUtilityCapacity();
+            } else if (building instanceof PowerPlantBuilding) {
+                powerCapacity += building.getUtilityCapacity();
             }
         }
 

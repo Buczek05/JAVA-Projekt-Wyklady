@@ -3,20 +3,17 @@ package pl.pk.citysim.model;
 /**
  * Represents a building in the city simulation.
  */
-public class Building {
-    private final BuildingType type;
+public abstract class Building {
     private final int id;
     private int occupancy;
 
     /**
-     * Creates a new building of the specified type.
+     * Creates a new building.
      *
-     * @param id   Unique identifier for the building
-     * @param type Type of the building
+     * @param id Unique identifier for the building
      */
-    public Building(int id, BuildingType type) {
+    protected Building(int id) {
         this.id = id;
-        this.type = type;
         this.occupancy = 0;
     }
 
@@ -25,24 +22,12 @@ public class Building {
      *
      * @return The building type
      */
-    public BuildingType getType() {
-        return type;
-    }
+    public abstract BuildingType getType();
 
-    /**
-     * Gets the unique identifier of the building.
-     *
-     * @return The building ID
-     */
     public int getId() {
         return id;
     }
 
-    /**
-     * Gets the current occupancy of the building.
-     *
-     * @return The current occupancy
-     */
     public int getOccupancy() {
         return occupancy;
     }
@@ -55,46 +40,43 @@ public class Building {
     public void setOccupancy(int occupancy) {
         if (occupancy < 0) {
             this.occupancy = 0;
-        } else if (occupancy > type.getCapacity()) {
-            this.occupancy = type.getCapacity();
+        } else if (occupancy > getCapacity()) {
+            this.occupancy = getCapacity();
         } else {
             this.occupancy = occupancy;
         }
     }
 
-    /**
-     * Gets the maximum capacity of the building.
-     *
-     * @return The maximum capacity
-     */
     public int getCapacity() {
-        return type.getCapacity();
+        return getType().getCapacity();
     }
 
-    /**
-     * Gets the daily upkeep cost of the building.
-     *
-     * @return The upkeep cost
-     */
     public int getUpkeep() {
-        return type.getUpkeep();
+        return getType().getUpkeep();
     }
 
-    /**
-     * Gets the satisfaction impact of the building.
-     *
-     * @return The satisfaction impact
-     */
     public int getSatisfactionImpact() {
-        return type.getSatisfactionImpact();
+        return getType().getSatisfactionImpact();
+    }
+
+    public int getEducationCapacity() {
+        return getType().getEducationCapacity();
+    }
+
+    public int getHealthcareCapacity() {
+        return getType().getHealthcareCapacity();
+    }
+
+    public int getUtilityCapacity() {
+        return getType().getUtilityCapacity();
     }
 
     @Override
     public String toString() {
         return "Building{" +
                 "id=" + id +
-                ", type=" + type +
-                ", occupancy=" + occupancy + "/" + type.getCapacity() +
+                ", type=" + getType() +
+                ", occupancy=" + occupancy + "/" + getCapacity() +
                 '}';
     }
 }

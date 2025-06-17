@@ -102,76 +102,34 @@ public class GameConfig {
         this.sandboxMode = Boolean.parseBoolean(props.getProperty("sandboxMode", String.valueOf(DEFAULT_SANDBOX_MODE)));
     }
 
-    /**
-     * Gets the initial number of families in the city.
-     *
-     * @return The initial number of families
-     */
     public int getInitialFamilies() {
         return initialFamilies;
     }
 
-    /**
-     * Gets the initial budget for the city.
-     *
-     * @return The initial budget
-     */
     public int getInitialBudget() {
         return initialBudget;
     }
 
-    /**
-     * Gets the initial tax rate for the city.
-     *
-     * @return The initial tax rate
-     */
     public double getInitialTaxRate() {
         return initialTaxRate;
     }
 
-    /**
-     * Gets the initial VAT rate for the city.
-     *
-     * @return The initial VAT rate
-     */
     public double getInitialVatRate() {
         return initialVatRate;
     }
 
-    /**
-     * Gets the interval between game ticks in milliseconds.
-     *
-     * @return The tick interval in milliseconds
-     */
     public long getTickIntervalMs() {
         return tickIntervalMs;
     }
 
-    /**
-     * Checks if the game is in sandbox mode.
-     *
-     * @return true if the game is in sandbox mode, false otherwise
-     */
     public boolean isSandboxMode() {
         return sandboxMode;
     }
 
-    /**
-     * Gets the initial number of families for the current game mode.
-     * In sandbox mode, this returns a higher value.
-     *
-     * @return The initial number of families
-     */
     public int getEffectiveInitialFamilies() {
         return sandboxMode ? SANDBOX_INITIAL_FAMILIES : initialFamilies;
     }
 
-    /**
-     * Gets the initial budget for the current game mode.
-     * In sandbox mode, this returns a higher value.
-     *
-     * @return The initial budget
-     */
     public int getEffectiveInitialBudget() {
         return sandboxMode ? SANDBOX_INITIAL_BUDGET : initialBudget;
     }

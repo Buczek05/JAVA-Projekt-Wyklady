@@ -11,7 +11,8 @@ import java.util.Random;
  */
 public class City {
     private int day;
-    private int families;
+    private int families; // Kept for backward compatibility
+    private FamilyManager familyManager;
     private int budget;
     private int satisfaction;
     private double taxRate;
@@ -24,6 +25,36 @@ public class City {
     private int dailyIncome;
     private int dailyExpenses;
 
+    // Track daily satisfaction changes
+    private int dailySatisfactionIncrease;
+    private int dailySatisfactionDecrease;
+
+    // Random number generator
+    private final Random random = new Random();
+
+    /**
+     * Default constructor for Jackson deserialization.
+     */
+    public City() {
+        this.day = 1;
+        this.families = 0;
+        this.familyManager = new FamilyManager();
+        this.budget = 0;
+        this.satisfaction = 50;
+        this.taxRate = 0.10;
+        this.vatRate = 0.05;
+        this.buildings = new ArrayList<>();
+        this.buildingCounts = new HashMap<>();
+        this.eventLog = new ArrayList<>();
+        this.dailySatisfactionIncrease = 0;
+        this.dailySatisfactionDecrease = 0;
+
+        // Initialize building counts
+        for (BuildingType type : BuildingType.values()) {
+            buildingCounts.put(type, 0);
+        }
+    }
+
     /**
      * Creates a new city with initial values.
      *
@@ -32,7 +63,8 @@ public class City {
      */
     public City(int initialFamilies, int initialBudget) {
         this.day = 1;
-        this.families = initialFamilies;
+        this.families = initialFamilies; // Kept for backward compatibility
+        this.familyManager = new FamilyManager(initialFamilies);
         this.budget = initialBudget;
         this.satisfaction = 50; // Start with neutral satisfaction
         this.taxRate = 0.10; // 10% default income tax rate
@@ -40,6 +72,8 @@ public class City {
         this.buildings = new ArrayList<>();
         this.buildingCounts = new HashMap<>();
         this.eventLog = new ArrayList<>();
+        this.dailySatisfactionIncrease = 0;
+        this.dailySatisfactionDecrease = 0;
 
         // Initialize building counts
         for (BuildingType type : BuildingType.values()) {
@@ -69,6 +103,10 @@ public class City {
 
         // Clear all previous logs
         eventLog.clear();
+
+        // Reset daily satisfaction change trackers
+        dailySatisfactionIncrease = 0;
+        dailySatisfactionDecrease = 0;
 
         // Add a day separator event
         eventLog.add("Day " + day + ": === NEW DAY ===");
@@ -104,14 +142,14 @@ public class City {
         int powerCapacity = 0;
 
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.SCHOOL) {
-                educationCapacity += building.getType().getEducationCapacity();
-            } else if (building.getType() == BuildingType.HOSPITAL) {
-                healthcareCapacity += building.getType().getHealthcareCapacity();
-            } else if (building.getType() == BuildingType.WATER_PLANT) {
-                waterCapacity += building.getType().getUtilityCapacity();
-            } else if (building.getType() == BuildingType.POWER_PLANT) {
-                powerCapacity += building.getType().getUtilityCapacity();
+            if (building instanceof SchoolBuilding) {
+                educationCapacity += building.getEducationCapacity();
+            } else if (building instanceof HospitalBuilding) {
+                healthcareCapacity += building.getHealthcareCapacity();
+            } else if (building instanceof WaterPlantBuilding) {
+                waterCapacity += building.getUtilityCapacity();
+            } else if (building instanceof PowerPlantBuilding) {
+                powerCapacity += building.getUtilityCapacity();
             }
         }
 
@@ -208,8 +246,8 @@ public class City {
             // Calculate water capacity
             int waterCapacity = 0;
             for (Building building : buildings) {
-                if (building.getType() == BuildingType.WATER_PLANT) {
-                    waterCapacity += building.getType().getUtilityCapacity();
+                if (building instanceof WaterPlantBuilding) {
+                    waterCapacity += building.getUtilityCapacity();
                 }
             }
 
@@ -234,7 +272,8 @@ public class City {
             satisfactionImpact += 3; // +3 for significant damage
         }
 
-        satisfaction -= satisfactionImpact;
+        // Apply negative satisfaction impact
+        int actualChange = updateSatisfactionValue(-satisfactionImpact);
 
         // Log the event with appropriate message
         if (waterPlantCount > 0) {
@@ -285,8 +324,8 @@ public class City {
         // Calculate hospital capacity and effectiveness
         int hospitalCapacity = 0;
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.HOSPITAL) {
-                hospitalCapacity += building.getType().getHealthcareCapacity();
+            if (building instanceof HospitalBuilding) {
+                hospitalCapacity += building.getHealthcareCapacity();
             }
         }
 
@@ -317,7 +356,7 @@ public class City {
 
         // Apply budget and satisfaction effects
         budget -= healthcareCosts;
-        satisfaction -= satisfactionImpact;
+        int actualChange = updateSatisfactionValue(-satisfactionImpact);
 
         // Log the event with appropriate message
         if (hospitalCapacity > 0) {
@@ -384,7 +423,7 @@ public class City {
 
         // Apply effects
         budget -= economicImpact; // Economic loss
-        satisfaction -= satisfactionImpact; // Reduced satisfaction
+        int actualChange = updateSatisfactionValue(-satisfactionImpact); // Reduced satisfaction
 
         // Log the event with severity indicator
         String severityIndicator = "";
@@ -438,7 +477,7 @@ public class City {
 
         // Apply effects
         budget += grantAmount; // Financial gain
-        satisfaction += satisfactionImpact; // Increased satisfaction
+        int actualChange = updateSatisfactionValue(satisfactionImpact); // Increased satisfaction
 
         // Log the event with size indicator
         String sizeIndicator = "";
@@ -461,7 +500,7 @@ public class City {
      */
     public Building addBuilding(BuildingType type, int cost) {
         int id = buildings.size() + 1;
-        Building building = new Building(id, type);
+        Building building = BuildingFactory.createBuilding(id, type);
         buildings.add(building);
 
         // Update building count
@@ -473,6 +512,7 @@ public class City {
 
         return building;
     }
+
 
     /**
      * Adds a new building to the city with the standard cost.
@@ -494,7 +534,7 @@ public class City {
      */
     private Building addInitialBuilding(BuildingType type) {
         int id = buildings.size() + 1;
-        Building building = new Building(id, type);
+        Building building = BuildingFactory.createBuilding(id, type);
         buildings.add(building);
 
         // Update building count
@@ -508,8 +548,14 @@ public class City {
      * Calculates daily income from taxes.
      */
     private void calculateDailyIncome() {
-        // Base family income scales with city development
-        int baseFamilyIncome = 50;
+        // Get the number of families
+        int familiesCount = familyManager.getFamiliesCount();
+
+        // If there are no families, there's no income
+        if (familiesCount == 0) {
+            dailyIncome = 0;
+            return;
+        }
 
         // Income bonus from commercial buildings
         int commercialCount = buildingCounts.getOrDefault(BuildingType.COMMERCIAL, 0);
@@ -522,56 +568,36 @@ public class City {
             jobQualityRatio = (double) commercialCount / totalJobBuildings;
         }
 
-        // Apply job quality bonus (up to 30% more income for high commercial ratio)
-        baseFamilyIncome += (int) (baseFamilyIncome * jobQualityRatio * 0.3);
-
         // Calculate available jobs
         int commercialJobs = 0;
         int industrialJobs = 0;
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.COMMERCIAL) {
+            if (building instanceof CommercialBuilding) {
                 commercialJobs += building.getCapacity();
-            } else if (building.getType() == BuildingType.INDUSTRIAL) {
+            } else if (building instanceof IndustrialBuilding) {
                 industrialJobs += building.getCapacity();
             }
         }
         int totalJobs = commercialJobs + industrialJobs;
 
         // Job shortage penalty (not enough jobs reduces income)
-        double jobRatio = families > 0 ? Math.min(1.0, (double) totalJobs / families) : 1.0;
+        double jobRatio = Math.min(1.0, (double) totalJobs / familiesCount);
         if (jobRatio < 1.0) {
-            int jobShortagePenalty = (int) (baseFamilyIncome * (1 - jobRatio) * 0.4); // Up to 40% penalty
-            baseFamilyIncome -= jobShortagePenalty;
-            eventLog.add(String.format("Day %d: Job shortage (%.1f%% coverage) reducing family income by $%d", 
-                    day, jobRatio * 100, jobShortagePenalty));
-        }
-
-        // Scale income with city size (larger cities have higher incomes but also higher costs)
-        // This creates a difficulty curve - early game is easier, late game is harder
-        if (families > 50) {
-            baseFamilyIncome += 15; // +15 for medium cities (was +10)
-        }
-        if (families > 100) {
-            baseFamilyIncome += 20; // +20 more for large cities (was +15)
-        }
-        if (families > 200) {
-            baseFamilyIncome += 25; // +25 more for very large cities (new tier)
+            eventLog.add(String.format("Day %d: Job shortage (%.1f%% coverage) reducing family income", 
+                    day, jobRatio * 100));
         }
 
         // Progressive difficulty scaling - income grows slower as city gets larger
         double difficultyScaling = 1.0;
-        if (families > 50) {
+        if (familiesCount > 50) {
             difficultyScaling = 0.95; // 5% income reduction for medium cities
         }
-        if (families > 100) {
+        if (familiesCount > 100) {
             difficultyScaling = 0.9; // 10% income reduction for large cities
         }
-        if (families > 200) {
+        if (familiesCount > 200) {
             difficultyScaling = 0.85; // 15% income reduction for very large cities
         }
-
-        // Apply difficulty scaling
-        baseFamilyIncome = (int)(baseFamilyIncome * difficultyScaling);
 
         // Log difficulty scaling if it's applied
         if (difficultyScaling < 1.0) {
@@ -582,51 +608,53 @@ public class City {
         // Calculate service quality impact on income
         int educationCapacity = 0;
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.SCHOOL) {
-                educationCapacity += building.getType().getEducationCapacity();
+            if (building instanceof SchoolBuilding) {
+                educationCapacity += building.getEducationCapacity();
             }
         }
 
         // Education bonus (better education = higher income)
-        double educationRatio = families > 0 ? Math.min(1.0, (double) educationCapacity / families) : 1.0;
-        int educationBonus = (int) (baseFamilyIncome * educationRatio * 0.25); // Up to 25% bonus (was 20%)
-        baseFamilyIncome += educationBonus;
+        double educationRatio = Math.min(1.0, (double) educationCapacity / familiesCount);
 
         // Utility quality impact on income (poor utilities reduce productivity)
         int waterCapacity = 0;
         int powerCapacity = 0;
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.WATER_PLANT) {
-                waterCapacity += building.getType().getUtilityCapacity();
-            } else if (building.getType() == BuildingType.POWER_PLANT) {
-                powerCapacity += building.getType().getUtilityCapacity();
+            if (building instanceof WaterPlantBuilding) {
+                waterCapacity += building.getUtilityCapacity();
+            } else if (building instanceof PowerPlantBuilding) {
+                powerCapacity += building.getUtilityCapacity();
             }
         }
 
-        double waterRatio = families > 0 ? Math.min(1.0, (double) waterCapacity / families) : 1.0;
-        double powerRatio = families > 0 ? Math.min(1.0, (double) powerCapacity / families) : 1.0;
+        double waterRatio = Math.min(1.0, (double) waterCapacity / familiesCount);
+        double powerRatio = Math.min(1.0, (double) powerCapacity / familiesCount);
 
         // Utility shortage penalty
         if (waterRatio < 0.8 || powerRatio < 0.8) {
             double worstUtilityRatio = Math.min(waterRatio, powerRatio);
-            int utilityPenalty = (int) (baseFamilyIncome * (1 - worstUtilityRatio) * 0.3); // Up to 30% penalty
-            baseFamilyIncome -= utilityPenalty;
-            eventLog.add(String.format("Day %d: Utility shortage reducing family income by $%d", 
-                    day, utilityPenalty));
+            eventLog.add(String.format("Day %d: Utility shortage reducing family income", day));
         }
 
+        // Update family incomes based on city conditions
+        familyManager.updateFamilyIncomes(jobQualityRatio, jobRatio, educationRatio, difficultyScaling);
+
+        // Get the total income of all families
+        int totalFamilyIncome = familyManager.getTotalIncome();
+
         // Income tax calculation (based on family income)
-        int incomeTaxRevenue = (int) (families * baseFamilyIncome * taxRate);
+        int incomeTaxRevenue = (int) (totalFamilyIncome * taxRate);
 
         // Daily spending per family (scales with income)
-        int dailySpendingPerFamily = (int) (baseFamilyIncome * 0.25); // Increased from 0.2 to 0.25
+        int averageFamilyIncome = familyManager.getAverageIncome();
+        int dailySpendingPerFamily = (int) (averageFamilyIncome * 0.25); // Increased from 0.2 to 0.25
 
         // Spending increases with satisfaction (happier citizens spend more)
         double satisfactionMultiplier = 0.7 + (satisfaction * 0.006); // 0.7 to 1.3 based on satisfaction (wider range)
         dailySpendingPerFamily = (int) (dailySpendingPerFamily * satisfactionMultiplier);
 
         // VAT calculation (based on family spending)
-        int vatRevenue = (int) (families * dailySpendingPerFamily * vatRate);
+        int vatRevenue = (int) (familiesCount * dailySpendingPerFamily * vatRate);
 
         // Total tax revenue
         int totalTaxRevenue = incomeTaxRevenue + vatRevenue;
@@ -697,17 +725,17 @@ public class City {
             int scaledUpkeep = (int) (baseUpkeep * scaleFactor);
 
             // Apply usage-based scaling for service buildings
-            if (type == BuildingType.SCHOOL || type == BuildingType.HOSPITAL || 
-                type == BuildingType.WATER_PLANT || type == BuildingType.POWER_PLANT) {
+            if (building instanceof SchoolBuilding || building instanceof HospitalBuilding || 
+                building instanceof WaterPlantBuilding || building instanceof PowerPlantBuilding) {
 
                 // Calculate usage ratio
                 double usageRatio = 0.0;
-                if (type == BuildingType.SCHOOL && families > 0) {
-                    usageRatio = Math.min(1.0, (double) families / type.getEducationCapacity());
-                } else if (type == BuildingType.HOSPITAL && families > 0) {
-                    usageRatio = Math.min(1.0, (double) families / type.getHealthcareCapacity());
-                } else if ((type == BuildingType.WATER_PLANT || type == BuildingType.POWER_PLANT) && families > 0) {
-                    usageRatio = Math.min(1.0, (double) families / type.getUtilityCapacity());
+                if (building instanceof SchoolBuilding && families > 0) {
+                    usageRatio = Math.min(1.0, (double) families / building.getEducationCapacity());
+                } else if (building instanceof HospitalBuilding && families > 0) {
+                    usageRatio = Math.min(1.0, (double) families / building.getHealthcareCapacity());
+                } else if ((building instanceof WaterPlantBuilding || building instanceof PowerPlantBuilding) && families > 0) {
+                    usageRatio = Math.min(1.0, (double) families / building.getUtilityCapacity());
                 }
 
                 // Higher usage means higher operational costs (50% base cost + up to 100% more at full capacity)
@@ -744,10 +772,10 @@ public class City {
         int waterCapacity = 0;
         int powerCapacity = 0;
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.WATER_PLANT) {
-                waterCapacity += building.getType().getUtilityCapacity();
-            } else if (building.getType() == BuildingType.POWER_PLANT) {
-                powerCapacity += building.getType().getUtilityCapacity();
+            if (building instanceof WaterPlantBuilding) {
+                waterCapacity += building.getUtilityCapacity();
+            } else if (building instanceof PowerPlantBuilding) {
+                powerCapacity += building.getUtilityCapacity();
             }
         }
 
@@ -856,14 +884,14 @@ public class City {
         int powerCapacity = 0;
 
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.SCHOOL) {
-                educationCapacity += building.getType().getEducationCapacity();
-            } else if (building.getType() == BuildingType.HOSPITAL) {
-                healthcareCapacity += building.getType().getHealthcareCapacity();
-            } else if (building.getType() == BuildingType.WATER_PLANT) {
-                waterCapacity += building.getType().getUtilityCapacity();
-            } else if (building.getType() == BuildingType.POWER_PLANT) {
-                powerCapacity += building.getType().getUtilityCapacity();
+            if (building instanceof SchoolBuilding) {
+                educationCapacity += building.getEducationCapacity();
+            } else if (building instanceof HospitalBuilding) {
+                healthcareCapacity += building.getHealthcareCapacity();
+            } else if (building instanceof WaterPlantBuilding) {
+                waterCapacity += building.getUtilityCapacity();
+            } else if (building instanceof PowerPlantBuilding) {
+                powerCapacity += building.getUtilityCapacity();
             }
         }
 
@@ -934,7 +962,13 @@ public class City {
         satisfactionChange += serviceQuality;
 
         // Apply change with limits
-        satisfaction += satisfactionChange / 10;
+        int scaledChange = satisfactionChange / 10;
+
+        // Store original satisfaction for logging
+        int oldSatisfaction = satisfaction;
+
+        // Apply the change using the new function that respects daily limits
+        int actualChange = updateSatisfactionValue(scaledChange);
 
         // Make 80% achievable but 100% very difficult
         if (satisfaction > 80) {
@@ -942,14 +976,10 @@ public class City {
             // The closer to 100%, the harder it gets
             double excessSatisfaction = satisfaction - 80;
             double diminishedExcess = excessSatisfaction * (1.0 - (excessSatisfaction / 40.0));
-            satisfaction = 80 + (int)diminishedExcess;
-        }
+            int newSatisfaction = 80 + (int)diminishedExcess;
 
-        // Ensure within limits
-        if (satisfaction > 100) {
-            satisfaction = 100;
-        } else if (satisfaction < 0) {
-            satisfaction = 0;
+            // Apply the diminishing returns directly (bypass daily limits for this adjustment)
+            satisfaction = newSatisfaction;
         }
 
         // Log satisfaction change
@@ -963,13 +993,14 @@ public class City {
         // Calculate available housing capacity
         int housingCapacity = 0;
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.RESIDENTIAL) {
+            if (building instanceof ResidentialBuilding) {
                 housingCapacity += building.getCapacity();
             }
         }
 
         // Calculate housing occupancy ratio
-        double housingOccupancyRatio = housingCapacity > 0 ? (double) families / housingCapacity : 1.0;
+        int familiesCount = familyManager.getFamiliesCount();
+        double housingOccupancyRatio = housingCapacity > 0 ? (double) familiesCount / housingCapacity : 1.0;
 
         // Check for overcrowding
         boolean isOvercrowded = housingOccupancyRatio > 0.9;
@@ -977,8 +1008,8 @@ public class City {
         // Calculate available jobs (commercial and industrial buildings)
         int availableJobs = 0;
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.COMMERCIAL || 
-                building.getType() == BuildingType.INDUSTRIAL) {
+            if (building instanceof CommercialBuilding || 
+                building instanceof IndustrialBuilding) {
                 availableJobs += building.getCapacity();
             }
         }
@@ -990,22 +1021,22 @@ public class City {
         int powerCapacity = 0;
 
         for (Building building : buildings) {
-            if (building.getType() == BuildingType.SCHOOL) {
-                educationCapacity += building.getType().getEducationCapacity();
-            } else if (building.getType() == BuildingType.HOSPITAL) {
-                healthcareCapacity += building.getType().getHealthcareCapacity();
-            } else if (building.getType() == BuildingType.WATER_PLANT) {
-                waterCapacity += building.getType().getUtilityCapacity();
-            } else if (building.getType() == BuildingType.POWER_PLANT) {
-                powerCapacity += building.getType().getUtilityCapacity();
+            if (building instanceof SchoolBuilding) {
+                educationCapacity += building.getEducationCapacity();
+            } else if (building instanceof HospitalBuilding) {
+                healthcareCapacity += building.getHealthcareCapacity();
+            } else if (building instanceof WaterPlantBuilding) {
+                waterCapacity += building.getUtilityCapacity();
+            } else if (building instanceof PowerPlantBuilding) {
+                powerCapacity += building.getUtilityCapacity();
             }
         }
 
         // Calculate service quality based on capacity ratios
-        double educationRatio = families > 0 ? Math.min(1.0, (double) educationCapacity / families) : 1.0;
-        double healthcareRatio = families > 0 ? Math.min(1.0, (double) healthcareCapacity / families) : 1.0;
-        double waterRatio = families > 0 ? Math.min(1.0, (double) waterCapacity / families) : 1.0;
-        double powerRatio = families > 0 ? Math.min(1.0, (double) powerCapacity / families) : 1.0;
+        double educationRatio = familiesCount > 0 ? Math.min(1.0, (double) educationCapacity / familiesCount) : 1.0;
+        double healthcareRatio = familiesCount > 0 ? Math.min(1.0, (double) healthcareCapacity / familiesCount) : 1.0;
+        double waterRatio = familiesCount > 0 ? Math.min(1.0, (double) waterCapacity / familiesCount) : 1.0;
+        double powerRatio = familiesCount > 0 ? Math.min(1.0, (double) powerCapacity / familiesCount) : 1.0;
 
         // Overall service quality (0.0 to 1.0)
         double serviceRatio = (educationRatio + healthcareRatio + waterRatio + powerRatio) / 4.0;
@@ -1015,10 +1046,10 @@ public class City {
         double arrivalChance = 0.05; // Lower base chance (5% instead of 10%)
 
         // Stronger satisfaction bonus
-        // Linear scale: 0% satisfaction = 0% bonus, 100% satisfaction = +45% bonus
-        arrivalChance += satisfaction * 0.0045; // Up to +45% for 100% satisfaction
+        // Linear scale: 0% satisfaction = 0% bonus, 100% satisfaction = +65% bonus
+        arrivalChance += satisfaction * 0.0065; // Up to +65% for 100% satisfaction
 
-        if (availableJobs > families) {
+        if (availableJobs > familiesCount) {
             arrivalChance += 0.1; // +10% if jobs available
         }
 
@@ -1070,7 +1101,7 @@ public class City {
         }
 
         // Housing constraints
-        int availableHousing = Math.max(0, housingCapacity - families);
+        int availableHousing = Math.max(0, housingCapacity - familiesCount);
 
         if (availableHousing <= 0) {
             arrivalChance = 0; // No chance if no housing available
@@ -1158,28 +1189,37 @@ public class City {
         double departureChance = Math.min(0.5, baseDepartureChance + serviceDepartureChance); // Cap at 50%
 
         // Apply departure chance to each family
-        for (int i = 0; i < families; i++) {
+        for (int i = 0; i < familiesCount; i++) {
             if (random.nextDouble() < departureChance) {
                 departures++;
             }
         }
 
         // Apply population changes
-        int oldFamilies = families;
-        families += newFamilies - departures;
+        int oldFamilies = familiesCount;
+
+        // Add new families
+        for (int i = 0; i < newFamilies; i++) {
+            familyManager.addFamily();
+        }
+
+        // Remove departing families
+        familyManager.removeFamilies(departures);
+
+        // Get updated count
+        familiesCount = familyManager.getFamiliesCount();
 
         // Ensure within housing capacity
-        if (families > housingCapacity) {
-            int excess = families - housingCapacity;
-            families = housingCapacity;
+        if (familiesCount > housingCapacity) {
+            int excess = familiesCount - housingCapacity;
+            familyManager.removeFamilies(excess);
+            familiesCount = familyManager.getFamiliesCount();
             eventLog.add(String.format("Day %d: CRITICAL - %d families couldn't find housing and left the city!", 
                     day, excess));
         }
 
-        // Ensure non-negative
-        if (families < 0) {
-            families = 0;
-        }
+        // Update the families field for backward compatibility
+        families = familiesCount;
 
         // Log population changes
         if (newFamilies > 0) {
@@ -1234,20 +1274,13 @@ public class City {
         if (this.taxRate > oldRate) {
             // Tax increase reduces satisfaction
             int satisfactionChange = (int)((this.taxRate - oldRate) * -500);
-            satisfaction += satisfactionChange;
-            eventLog.add(String.format("Day %d: Tax increase reduced satisfaction by %d points.", day, -satisfactionChange));
+            int actualChange = updateSatisfactionValue(satisfactionChange);
+            eventLog.add(String.format("Day %d: Tax increase reduced satisfaction by %d points.", day, -actualChange));
         } else if (this.taxRate < oldRate) {
             // Tax decrease increases satisfaction
             int satisfactionChange = (int)((oldRate - this.taxRate) * 100);
-            satisfaction += satisfactionChange;
-            eventLog.add(String.format("Day %d: Tax decrease improved satisfaction by %d points.", day, satisfactionChange));
-        }
-
-        // Ensure satisfaction stays within bounds
-        if (satisfaction > 100) {
-            satisfaction = 100;
-        } else if (satisfaction < 0) {
-            satisfaction = 0;
+            int actualChange = updateSatisfactionValue(satisfactionChange);
+            eventLog.add(String.format("Day %d: Tax decrease improved satisfaction by %d points.", day, actualChange));
         }
 
         // Log income tax rate change
@@ -1260,8 +1293,22 @@ public class City {
         return day;
     }
 
+    /**
+     * Gets the number of families in the city.
+     *
+     * @return The number of families
+     */
     public int getFamilies() {
-        return families;
+        return familyManager.getFamiliesCount();
+    }
+
+    /**
+     * Gets the family manager.
+     *
+     * @return The family manager
+     */
+    public FamilyManager getFamilyManager() {
+        return familyManager;
     }
 
     public int getBudget() {
@@ -1272,15 +1319,61 @@ public class City {
         return satisfaction;
     }
 
+    /**
+     * Updates the satisfaction value with the given change, respecting daily limits.
+     * Satisfaction can increase by at most 5 points per day but can decrease by up to 50 points per day.
+     *
+     * @param change The amount to change satisfaction by (positive or negative)
+     * @return The actual amount that satisfaction was changed by
+     */
+    private int updateSatisfactionValue(int change) {
+        int actualChange = 0;
+
+        if (change > 0) {
+            // Positive change (increase) - limited to 5 points per day
+            int remainingIncrease = 5 - dailySatisfactionIncrease;
+            if (remainingIncrease <= 0) {
+                // Already reached the daily increase limit
+                return 0;
+            }
+
+            // Apply the change, but don't exceed the daily limit
+            actualChange = Math.min(change, remainingIncrease);
+            satisfaction += actualChange;
+            dailySatisfactionIncrease += actualChange;
+        } else if (change < 0) {
+            // Negative change (decrease) - limited to 50 points per day
+            int remainingDecrease = 50 - dailySatisfactionDecrease;
+            if (remainingDecrease <= 0) {
+                // Already reached the daily decrease limit
+                return 0;
+            }
+
+            // Apply the change, but don't exceed the daily limit
+            // Note: change is negative, so we use Math.max to limit the magnitude
+            actualChange = Math.max(change, -remainingDecrease);
+            satisfaction += actualChange;
+            dailySatisfactionDecrease += Math.abs(actualChange);
+        }
+
+        // Ensure satisfaction stays within bounds (0-100)
+        if (satisfaction > 100) {
+            int overflow = satisfaction - 100;
+            satisfaction = 100;
+            actualChange -= overflow;
+        } else if (satisfaction < 0) {
+            int underflow = -satisfaction;
+            satisfaction = 0;
+            actualChange += underflow;
+        }
+
+        return actualChange;
+    }
+
     public double getTaxRate() {
         return taxRate;
     }
 
-    /**
-     * Gets the current VAT rate for the city.
-     *
-     * @return The VAT rate (0.0 to 1.0)
-     */
     public double getVatRate() {
         return vatRate;
     }
@@ -1305,20 +1398,13 @@ public class City {
         if (this.vatRate > oldRate) {
             // VAT increase reduces satisfaction
             int satisfactionChange = (int)((this.vatRate - oldRate) * -80);
-            satisfaction += satisfactionChange;
-            eventLog.add(String.format("Day %d: VAT increase reduced satisfaction by %d points.", day, -satisfactionChange));
+            int actualChange = updateSatisfactionValue(satisfactionChange);
+            eventLog.add(String.format("Day %d: VAT increase reduced satisfaction by %d points.", day, -actualChange));
         } else if (this.vatRate < oldRate) {
             // VAT decrease increases satisfaction
             int satisfactionChange = (int)((oldRate - this.vatRate) * 40);
-            satisfaction += satisfactionChange;
-            eventLog.add(String.format("Day %d: VAT decrease improved satisfaction by %d points.", day, satisfactionChange));
-        }
-
-        // Ensure satisfaction stays within bounds
-        if (satisfaction > 100) {
-            satisfaction = 100;
-        } else if (satisfaction < 0) {
-            satisfaction = 0;
+            int actualChange = updateSatisfactionValue(satisfactionChange);
+            eventLog.add(String.format("Day %d: VAT decrease improved satisfaction by %d points.", day, actualChange));
         }
 
         // Log VAT rate change
@@ -1333,30 +1419,14 @@ public class City {
         return new HashMap<>(buildingCounts);
     }
 
-    /**
-     * Gets the event log for the city.
-     *
-     * @return The event log
-     */
     public List<String> getEventLog() {
         return new ArrayList<>(eventLog);
     }
 
-    /**
-     * Gets the most recent events (up to the specified limit).
-     *
-     * @return The list of recent events
-     */
     public List<String> getRecentEvents() {
         return eventLog;
     }
 
-    /**
-     * Gets all events from a specific day.
-     *
-     * @param day The day to get events for
-     * @return All events from the specified day
-     */
     public List<String> getEventsByDay(int day) {
         List<String> dayEvents = new ArrayList<>();
         String dayPrefix = "Day " + day + ":";
@@ -1370,29 +1440,14 @@ public class City {
         return dayEvents;
     }
 
-    /**
-     * Gets all events from the current day.
-     *
-     * @return All events from the current day
-     */
     public List<String> getCurrentDayEvents() {
         return getEventsByDay(day);
     }
 
-    /**
-     * Gets the daily income from taxes.
-     *
-     * @return The daily income
-     */
     public int getDailyIncome() {
         return dailyIncome;
     }
 
-    /**
-     * Gets the daily expenses for building upkeep and city services.
-     *
-     * @return The daily expenses
-     */
     public int getDailyExpenses() {
         return dailyExpenses;
     }

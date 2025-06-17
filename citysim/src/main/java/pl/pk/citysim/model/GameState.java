@@ -61,20 +61,10 @@ public class GameState {
         this.gameStartedAt = gameStartedAt != null ? gameStartedAt : savedAt; // Fallback for backward compatibility
     }
 
-    /**
-     * Gets the city from this game state.
-     *
-     * @return The city
-     */
     public City getCity() {
         return city;
     }
 
-    /**
-     * Gets the time when this game state was saved.
-     *
-     * @return The saved time
-     */
     public LocalDateTime getSavedAt() {
         return savedAt;
     }
