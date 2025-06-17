@@ -117,6 +117,9 @@ public class Highscore implements Comparable<Highscore> {
             // Load existing highscores
             List<Highscore> highscores = loadHighscores();
 
+            // Remove any existing highscore for the same city
+            highscores.removeIf(h -> h.getCityName().equals(highscore.getCityName()));
+
             // Add the new highscore
             highscores.add(highscore);
 
