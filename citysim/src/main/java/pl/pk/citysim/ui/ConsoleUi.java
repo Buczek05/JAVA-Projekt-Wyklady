@@ -3,11 +3,11 @@ package pl.pk.citysim.ui;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 import pl.pk.citysim.engine.GameLoop;
-import pl.pk.citysim.model.BuildingType;
 import pl.pk.citysim.model.GameConfig;
 import pl.pk.citysim.model.Highscore;
 import pl.pk.citysim.model.GameState;
 import pl.pk.citysim.service.CityService;
+import pl.pk.citysim.model.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +22,18 @@ import java.util.Map;
 public class ConsoleUi {
     private static final Logger logger = Logger.getLogger(ConsoleUi.class.getName());
     private static final int MAX_HIGHSCORES = 10; // Same value as in Highscore class
+    private static final Map<String, Class<? extends Building>> BUILDING_MAP = new HashMap<>();
+
+    static {
+        BUILDING_MAP.put("RESIDENTIAL", ResidentialBuilding.class);
+        BUILDING_MAP.put("COMMERCIAL", CommercialBuilding.class);
+        BUILDING_MAP.put("INDUSTRIAL", IndustrialBuilding.class);
+        BUILDING_MAP.put("PARK", ParkBuilding.class);
+        BUILDING_MAP.put("SCHOOL", SchoolBuilding.class);
+        BUILDING_MAP.put("HOSPITAL", HospitalBuilding.class);
+        BUILDING_MAP.put("WATER_PLANT", WaterPlantBuilding.class);
+        BUILDING_MAP.put("POWER_PLANT", PowerPlantBuilding.class);
+    }
 
     private final CityService cityService;
     private final GameLoop gameLoop;
@@ -265,22 +277,33 @@ public class ConsoleUi {
                         }
                     }
 
+                    Class<? extends Building> buildingClass = BUILDING_MAP.get(buildingTypeName);
+                    if (buildingClass == null) {
+                        System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown building type: " + buildingTypeName));
+                        System.out.println(ConsoleFormatter.createDivider());
+                        System.out.println("Available building types: " + String.join(", ", getBuildingTypeNames()));
+                        break;
+                    }
+                    String typeName = BUILDING_MAP.entrySet().stream()
+                            .filter(e -> e.getValue() == buildingClass)
+                            .map(Map.Entry::getKey)
+                            .findFirst().orElse(buildingClass.getSimpleName());
+                    boolean success = cityService.buildBuildings(buildingClass, count);
                     try {
-                        BuildingType buildingType = BuildingType.valueOf(buildingTypeName);
-                        boolean success = cityService.buildBuildings(buildingType, count);
+                        CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(buildingClass);
                         if (success) {
                             // Get the building cost information
-                            CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(buildingType);
                             int baseCost = buildingCost.getBaseCost();
                             int actualCost = buildingCost.getActualCost();
                             double multiplier = buildingCost.getMultiplier();
 
+
                             if (count == 1) {
                                 System.out.println(ConsoleFormatter.highlightSuccess(
-                                    "SUCCESS: Built a new " + buildingType.getName()));
+                                    "SUCCESS: Built a new " + typeName));
                             } else {
                                 System.out.println(ConsoleFormatter.highlightSuccess(
-                                    "SUCCESS: Built " + count + " new " + buildingType.getName() + " buildings"));
+                                    "SUCCESS: Built " + count + " new " + typeName + " buildings"));
                             }
 
                             // Show base cost and actual cost with multiplier
@@ -291,21 +314,21 @@ public class ConsoleUi {
                             } else {
                                 System.out.println("Actual cost per building: $" + actualCost);
                             }
-                            System.out.println("Daily upkeep per building: $" + buildingType.getUpkeep());
+                            System.out.println("Daily upkeep per building: $" + newInstance(buildingClass).getUpkeep());
 
                             if (count > 1) {
                                 System.out.println("Total initial cost: $" + (actualCost * count));
-                                System.out.println("Total daily upkeep: $" + (buildingType.getUpkeep() * count));
+                                System.out.println("Total daily upkeep: $" + (newInstance(buildingClass).getUpkeep() * count));
                             }
                         } else {
                             // Get the building cost information
-                            CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(buildingType);
+                            CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(buildingClass);
                             int actualCost = buildingCost.getActualCost();
                             double multiplier = buildingCost.getMultiplier();
 
                             if (count == 1) {
                                 System.out.println(ConsoleFormatter.highlightError(
-                                    "ERROR: Failed to build " + buildingType.getName() + " - not enough budget"));
+                                    "ERROR: Failed to build " + typeName + " - not enough budget"));
                                 System.out.println("Required budget: $" + actualCost);
                                 if (multiplier > 1.0) {
                                     System.out.println("Note: Cost includes x" + String.format("%.1f", multiplier) + 
@@ -313,7 +336,7 @@ public class ConsoleUi {
                                 }
                             } else {
                                 System.out.println(ConsoleFormatter.highlightError(
-                                    "ERROR: Failed to build " + count + " " + buildingType.getName() + " buildings - not enough budget"));
+                                    "ERROR: Failed to build " + count + " " + typeName + " buildings - not enough budget"));
                                 System.out.println("Required budget: $" + (actualCost * count));
                                 if (multiplier > 1.0) {
                                     System.out.println("Note: Cost includes x" + String.format("%.1f", multiplier) + 
@@ -322,11 +345,8 @@ public class ConsoleUi {
                             }
                             System.out.println("Current budget: $" + cityService.getCity().getBudget());
                         }
-                    } catch (IllegalArgumentException e) {
-                        System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown building type: " + buildingTypeName));
-                        System.out.println(ConsoleFormatter.createDivider());
-                        System.out.println("Available building types: " + 
-                                String.join(", ", getBuildingTypeNames()));
+                    } catch (Exception e) {
+                        System.out.println(ConsoleFormatter.highlightError("ERROR: " + e.getMessage()));
                     }
                 }
                 break;
@@ -683,30 +703,30 @@ public class ConsoleUi {
                     System.out.println("Note: As your city grows, building costs increase (up to 3x for very large cities).");
                     System.out.println();
                     System.out.println("Available building types:");
-                    for (BuildingType type : BuildingType.values()) {
-                        System.out.println("  " + type.name() + " - " + type.getDescription());
-                        if (type == BuildingType.RESIDENTIAL || type == BuildingType.COMMERCIAL || type == BuildingType.INDUSTRIAL) {
-                            System.out.println("    Capacity: " + type.getCapacity() + (type == BuildingType.RESIDENTIAL ? " families" : " jobs"));
-                        } else if (type == BuildingType.SCHOOL) {
-                            System.out.println("    Serves up to " + type.getEducationCapacity() + " families");
-                        } else if (type == BuildingType.HOSPITAL) {
-                            System.out.println("    Serves up to " + type.getHealthcareCapacity() + " families");
-                        } else if (type == BuildingType.WATER_PLANT || type == BuildingType.POWER_PLANT) {
-                            System.out.println("    Serves up to " + type.getUtilityCapacity() + " families");
+                    for (Map.Entry<String, Class<? extends Building>> entry : BUILDING_MAP.entrySet()) {
+                        Building tmp = newInstance(entry.getValue());
+                        System.out.println("  " + entry.getKey() + " - " + tmp.getDescription());
+                        if (tmp instanceof ResidentialBuilding || tmp instanceof CommercialBuilding || tmp instanceof IndustrialBuilding) {
+                            System.out.println("    Capacity: " + tmp.getCapacity() + (tmp instanceof ResidentialBuilding ? " families" : " jobs"));
+                        } else if (tmp instanceof SchoolBuilding) {
+                            System.out.println("    Serves up to " + tmp.getEducationCapacity() + " families");
+                        } else if (tmp instanceof HospitalBuilding) {
+                            System.out.println("    Serves up to " + tmp.getHealthcareCapacity() + " families");
+                        } else if (tmp instanceof WaterPlantBuilding || tmp instanceof PowerPlantBuilding) {
+                            System.out.println("    Serves up to " + tmp.getUtilityCapacity() + " families");
                         }
-                        // Get the building cost information
-                        CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(type);
+                        CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(entry.getValue());
                         int baseCost = buildingCost.getBaseCost();
                         int actualCost = buildingCost.getActualCost();
                         double multiplier = buildingCost.getMultiplier();
 
                         if (multiplier > 1.0) {
-                            System.out.println("    Base cost: $" + baseCost + ", Actual cost: $" + actualCost + 
+                            System.out.println("    Base cost: $" + baseCost + ", Actual cost: $" + actualCost +
                                 " (x" + String.format("%.1f", multiplier) + " due to city size)");
                         } else {
                             System.out.println("    Initial cost: $" + actualCost);
                         }
-                        System.out.println("    Daily upkeep: $" + type.getUpkeep());
+                        System.out.println("    Daily upkeep: $" + tmp.getUpkeep());
                     }
                     break;
 
@@ -880,12 +900,15 @@ public class ConsoleUi {
      * @return Array of building type names
      */
     private String[] getBuildingTypeNames() {
-        BuildingType[] types = BuildingType.values();
-        String[] names = new String[types.length];
-        for (int i = 0; i < types.length; i++) {
-            names[i] = types[i].name();
+        return BUILDING_MAP.keySet().toArray(new String[0]);
+    }
+
+    private Building newInstance(Class<? extends Building> clazz) {
+        try {
+            return clazz.getConstructor(int.class).newInstance(0);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        return names;
     }
 
     /**

@@ -17,11 +17,11 @@ public class CityInitializationTest {
         assertFalse(city.getBuildings().isEmpty(), "City should have initial buildings");
         
         // Check that we have one of each essential building type
-        assertEquals(1, countBuildingsByType(city, BuildingType.RESIDENTIAL), "Should have one residential building");
-        assertEquals(1, countBuildingsByType(city, BuildingType.SCHOOL), "Should have one school");
-        assertEquals(1, countBuildingsByType(city, BuildingType.HOSPITAL), "Should have one hospital");
-        assertEquals(1, countBuildingsByType(city, BuildingType.WATER_PLANT), "Should have one water plant");
-        assertEquals(1, countBuildingsByType(city, BuildingType.POWER_PLANT), "Should have one power plant");
+        assertEquals(1, countBuildingsByClass(city, ResidentialBuilding.class), "Should have one residential building");
+        assertEquals(1, countBuildingsByClass(city, SchoolBuilding.class), "Should have one school");
+        assertEquals(1, countBuildingsByClass(city, HospitalBuilding.class), "Should have one hospital");
+        assertEquals(1, countBuildingsByClass(city, WaterPlantBuilding.class), "Should have one water plant");
+        assertEquals(1, countBuildingsByClass(city, PowerPlantBuilding.class), "Should have one power plant");
         
         // Initial number of families
         int initialFamilies = city.getFamilies();
@@ -41,9 +41,9 @@ public class CityInitializationTest {
     /**
      * Helper method to count buildings of a specific type.
      */
-    private int countBuildingsByType(City city, BuildingType type) {
+    private int countBuildingsByClass(City city, Class<? extends Building> clazz) {
         return (int) city.getBuildings().stream()
-                .filter(b -> b.getType() == type)
+                .filter(clazz::isInstance)
                 .count();
     }
 }

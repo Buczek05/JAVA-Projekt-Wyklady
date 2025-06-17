@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import pl.pk.citysim.model.*;
+
 /**
  * Represents the city in the simulation.
  */
@@ -92,11 +94,11 @@ public class City {
 
         // Add initial buildings to provide basic services without cost
         // (these are considered pre-existing infrastructure)
-        addInitialBuilding(BuildingType.RESIDENTIAL); // Housing for families
-        addInitialBuilding(BuildingType.SCHOOL);      // Education
-        addInitialBuilding(BuildingType.HOSPITAL);    // Healthcare
-        addInitialBuilding(BuildingType.WATER_PLANT); // Water supply
-        addInitialBuilding(BuildingType.POWER_PLANT); // Power supply
+        addInitialBuilding(ResidentialBuilding.class); // Housing for families
+        addInitialBuilding(SchoolBuilding.class);      // Education
+        addInitialBuilding(HospitalBuilding.class);    // Healthcare
+        addInitialBuilding(WaterPlantBuilding.class); // Water supply
+        addInitialBuilding(PowerPlantBuilding.class); // Power supply
 
         // Add initial log entry
         eventLog.add("Day 1: City founded with " + initialFamilies + " families and $" + initialBudget + " budget.");
@@ -502,15 +504,26 @@ public class City {
     }
 
     /**
+     * Creates a building instance of the specified class.
+     */
+    private Building createBuilding(int id, Class<? extends Building> clazz) {
+        try {
+            return clazz.getConstructor(int.class).newInstance(id);
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to create building", e);
+        }
+    }
+
+    /**
      * Adds a new building to the city.
      *
      * @param type The type of building to add
      * @param cost The cost of the building (with any multipliers applied)
      * @return The newly created building
      */
-    public Building addBuilding(BuildingType type, int cost) {
+    public Building addBuilding(Class<? extends Building> clazz, int cost) {
         int id = buildings.size() + 1;
-        Building building = BuildingFactory.createBuilding(id, type);
+        Building building = createBuilding(id, clazz);
         buildings.add(building);
 
         // Update building count
@@ -531,9 +544,13 @@ public class City {
      * @param type The type of building to add
      * @return The newly created building
      */
-    public Building addBuilding(BuildingType type) {
-        // Use the standard cost (10x the upkeep)
-        return addBuilding(type, type.getUpkeep() * 10);
+    public Building addBuilding(Class<? extends Building> clazz) {
+        try {
+            Building temp = clazz.getConstructor(int.class).newInstance(0);
+            return addBuilding(clazz, temp.getUpkeep() * 10);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create building", e);
+        }
     }
 
     /**
@@ -543,9 +560,9 @@ public class City {
      * @param type The type of building to add
      * @return The newly created building
      */
-    private Building addInitialBuilding(BuildingType type) {
+    private Building addInitialBuilding(Class<? extends Building> clazz) {
         int id = buildings.size() + 1;
-        Building building = BuildingFactory.createBuilding(id, type);
+        Building building = createBuilding(id, clazz);
         buildings.add(building);
 
         // Update building count
@@ -570,8 +587,8 @@ public class City {
         }
 
         // Income bonus from commercial buildings
-        int commercialCount = buildingCounts.getOrDefault(BuildingType.COMMERCIAL, 0);
-        int industrialCount = buildingCounts.getOrDefault(BuildingType.INDUSTRIAL, 0);
+        int commercialCount = buildingCounts.getOrDefault("Commercial", 0);
+        int industrialCount = buildingCounts.getOrDefault("Industrial", 0);
 
         // Calculate job quality ratio (commercial jobs are better quality than industrial)
         double jobQualityRatio = 0.0;
@@ -799,8 +816,8 @@ public class City {
 
         // Utility operation costs (scales with family count and usage)
         int utilityOperationCost = 0;
-        int waterPlantCount = buildingCounts.getOrDefault(BuildingType.WATER_PLANT, 0);
-        int powerPlantCount = buildingCounts.getOrDefault(BuildingType.POWER_PLANT, 0);
+        int waterPlantCount = buildingCounts.getOrDefault("Water Plant", 0);
+        int powerPlantCount = buildingCounts.getOrDefault("Power Plant", 0);
 
         if (waterPlantCount > 0) {
             // Base cost + usage-based cost
@@ -830,10 +847,10 @@ public class City {
 
         // Log upkeep by building type if there are buildings
         if (!buildings.isEmpty()) {
-            for (BuildingType type : BuildingType.values()) {
-                int typeUpkeep = upkeepByType.get(type);
+            for (String typeName : buildingCounts.keySet()) {
+                int typeUpkeep = upkeepByType.get(typeName);
                 if (typeUpkeep > 0) {
-                    expenseLog.append(String.format("  - %s: $%d\n", type.getName(), typeUpkeep));
+                    expenseLog.append(String.format("  - %s: $%d\n", typeName, typeUpkeep));
                 }
             }
         }
