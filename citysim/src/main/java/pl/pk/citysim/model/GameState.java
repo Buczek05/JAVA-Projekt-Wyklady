@@ -23,7 +23,8 @@ public class GameState {
     private static final Logger logger = LoggerFactory.getLogger(GameState.class);
     private static final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
-            .enable(SerializationFeature.INDENT_OUTPUT);
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     // Default saves directory path, can be overridden in tests
     private static String SAVES_DIR = "saves";

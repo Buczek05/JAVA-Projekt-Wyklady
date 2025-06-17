@@ -5,18 +5,13 @@ package pl.pk.citysim.model;
  * Houses families and increases population.
  */
 public class ResidentialBuilding extends Building {
-    
+
     /**
      * Creates a new residential building.
      *
      * @param id Unique identifier for the building
      */
     public ResidentialBuilding(int id) {
-        super(id);
-    }
-    
-    @Override
-    public BuildingType getType() {
-        return BuildingType.RESIDENTIAL;
+        super(id, "Residential", "Houses families, increases population", 25, 5, 5, 0, 0, 0);
     }
 }

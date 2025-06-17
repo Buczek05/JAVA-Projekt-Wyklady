@@ -5,18 +5,13 @@ package pl.pk.citysim.model;
  * Provides jobs and generates income.
  */
 public class CommercialBuilding extends Building {
-    
+
     /**
      * Creates a new commercial building.
      *
      * @param id Unique identifier for the building
      */
     public CommercialBuilding(int id) {
-        super(id);
-    }
-    
-    @Override
-    public BuildingType getType() {
-        return BuildingType.COMMERCIAL;
+        super(id, "Commercial", "Provides jobs and generates income", 15, 10, 2, 0, 0, 0);
     }
 }

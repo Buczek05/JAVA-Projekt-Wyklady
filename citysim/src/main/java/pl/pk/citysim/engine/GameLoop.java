@@ -44,16 +44,6 @@ public class GameLoop {
     }
 
     /**
-     * Stops the game loop.
-     */
-    public void stop() {
-        if (running) {
-            running = false;
-            logger.log(Level.INFO, "Stopping game loop");
-        }
-    }
-
-    /**
      * Performs a single tick of the game loop.
      * 
      * @return true if the game should continue, false if game over
@@ -75,15 +65,5 @@ public class GameLoop {
             logger.log(Level.SEVERE, "Error during game tick", e);
             return false;
         }
-    }
-
-
-    /**
-     * Checks if the game loop is currently running.
-     *
-     * @return true if the game loop is running, false otherwise
-     */
-    public boolean isRunning() {
-        return running;
     }
 }

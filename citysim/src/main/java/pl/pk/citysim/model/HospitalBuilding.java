@@ -5,18 +5,13 @@ package pl.pk.citysim.model;
  * Improves health and satisfaction.
  */
 public class HospitalBuilding extends Building {
-    
+
     /**
      * Creates a new hospital.
      *
      * @param id Unique identifier for the building
      */
     public HospitalBuilding(int id) {
-        super(id);
-    }
-    
-    @Override
-    public BuildingType getType() {
-        return BuildingType.HOSPITAL;
+        super(id, "Hospital", "Improves health and satisfaction", 0, 25, 7, 0, 60, 0);
     }
 }

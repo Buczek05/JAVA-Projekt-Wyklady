@@ -18,7 +18,7 @@ public class City {
     private double taxRate;
     private double vatRate;
     private final List<Building> buildings;
-    private final Map<BuildingType, Integer> buildingCounts;
+    private final Map<String, Integer> buildingCounts;
     private final List<String> eventLog;
 
     // Track daily income and expenses
@@ -49,10 +49,15 @@ public class City {
         this.dailySatisfactionIncrease = 0;
         this.dailySatisfactionDecrease = 0;
 
-        // Initialize building counts
-        for (BuildingType type : BuildingType.values()) {
-            buildingCounts.put(type, 0);
-        }
+        // Initialize building counts for each building type
+        buildingCounts.put("Residential", 0);
+        buildingCounts.put("Commercial", 0);
+        buildingCounts.put("Industrial", 0);
+        buildingCounts.put("Park", 0);
+        buildingCounts.put("School", 0);
+        buildingCounts.put("Hospital", 0);
+        buildingCounts.put("Water Plant", 0);
+        buildingCounts.put("Power Plant", 0);
     }
 
     /**
@@ -75,10 +80,15 @@ public class City {
         this.dailySatisfactionIncrease = 0;
         this.dailySatisfactionDecrease = 0;
 
-        // Initialize building counts
-        for (BuildingType type : BuildingType.values()) {
-            buildingCounts.put(type, 0);
-        }
+        // Initialize building counts for each building type
+        buildingCounts.put("Residential", 0);
+        buildingCounts.put("Commercial", 0);
+        buildingCounts.put("Industrial", 0);
+        buildingCounts.put("Park", 0);
+        buildingCounts.put("School", 0);
+        buildingCounts.put("Hospital", 0);
+        buildingCounts.put("Water Plant", 0);
+        buildingCounts.put("Power Plant", 0);
 
         // Add initial buildings to provide basic services without cost
         // (these are considered pre-existing infrastructure)
@@ -239,7 +249,7 @@ public class City {
         }
 
         // Check if there are water plants to mitigate the damage
-        int waterPlantCount = buildingCounts.getOrDefault(BuildingType.WATER_PLANT, 0);
+        int waterPlantCount = buildingCounts.getOrDefault("Water Plant", 0);
         int damageReduction = 0; // Initialize damage reduction to 0
 
         if (waterPlantCount > 0) {
@@ -278,10 +288,10 @@ public class City {
         // Log the event with appropriate message
         if (waterPlantCount > 0) {
             eventLog.add(String.format("Day %d: FIRE! A %s caught fire. Water system helped reduce damage by $%d. Total damage: $%d.", 
-                    day, affectedBuilding.getType().getName(), damageReduction, damage));
+                    day, affectedBuilding.getTypeName(), damageReduction, damage));
         } else {
             eventLog.add(String.format("Day %d: FIRE! A %s caught fire, causing $%d in damages.", 
-                    day, affectedBuilding.getType().getName(), damage));
+                    day, affectedBuilding.getTypeName(), damage));
         }
     }
 
@@ -385,8 +395,8 @@ public class City {
         }
 
         // Scale impact with commercial/industrial ratio (more commercial = less severe)
-        int commercialCount = buildingCounts.getOrDefault(BuildingType.COMMERCIAL, 0);
-        int industrialCount = buildingCounts.getOrDefault(BuildingType.INDUSTRIAL, 0);
+        int commercialCount = buildingCounts.getOrDefault("Commercial", 0);
+        int industrialCount = buildingCounts.getOrDefault("Industrial", 0);
 
         // Calculate job diversity ratio
         double commercialRatio = 0.5; // Default balanced ratio
@@ -504,8 +514,9 @@ public class City {
         buildings.add(building);
 
         // Update building count
-        int count = buildingCounts.getOrDefault(type, 0);
-        buildingCounts.put(type, count + 1);
+        String typeName = building.getTypeName();
+        int count = buildingCounts.getOrDefault(typeName, 0);
+        buildingCounts.put(typeName, count + 1);
 
         // Deduct building cost from budget
         budget -= cost;
@@ -538,8 +549,9 @@ public class City {
         buildings.add(building);
 
         // Update building count
-        int count = buildingCounts.getOrDefault(type, 0);
-        buildingCounts.put(type, count + 1);
+        String typeName = building.getTypeName();
+        int count = buildingCounts.getOrDefault(typeName, 0);
+        buildingCounts.put(typeName, count + 1);
 
         return building;
     }
@@ -676,12 +688,12 @@ public class City {
     private void calculateDailyExpenses() {
         // Building upkeep expenses (scales with building age and city size)
         int buildingUpkeep = 0;
-        Map<BuildingType, Integer> upkeepByType = new HashMap<>();
+        Map<String, Integer> upkeepByType = new HashMap<>();
 
         // Initialize upkeep by type
-        for (BuildingType type : BuildingType.values()) {
-            upkeepByType.put(type, 0);
-        }
+        buildingCounts.keySet().forEach(typeName -> {
+            upkeepByType.put(typeName, 0);
+        });
 
         // Scale factor based on city size (larger cities have higher maintenance costs)
         double scaleFactor = 1.0;
@@ -718,7 +730,7 @@ public class City {
 
         // Calculate upkeep with scaling and usage-based costs
         for (Building building : buildings) {
-            BuildingType type = building.getType();
+            String typeName = building.getTypeName();
             int baseUpkeep = building.getUpkeep();
 
             // Apply scale factor
@@ -747,7 +759,7 @@ public class City {
             buildingUpkeep += scaledUpkeep;
 
             // Track upkeep by building type
-            upkeepByType.put(type, upkeepByType.get(type) + scaledUpkeep);
+            upkeepByType.put(typeName, upkeepByType.get(typeName) + scaledUpkeep);
         }
 
         // City services expenses (base cost + per family cost)
@@ -1415,7 +1427,7 @@ public class City {
         return new ArrayList<>(buildings);
     }
 
-    public Map<BuildingType, Integer> getBuildingCounts() {
+    public Map<String, Integer> getBuildingCounts() {
         return new HashMap<>(buildingCounts);
     }
 

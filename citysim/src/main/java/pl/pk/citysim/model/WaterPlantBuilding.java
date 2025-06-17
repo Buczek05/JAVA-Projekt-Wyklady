@@ -5,18 +5,13 @@ package pl.pk.citysim.model;
  * Provides water to families.
  */
 public class WaterPlantBuilding extends Building {
-    
+
     /**
      * Creates a new water plant.
      *
      * @param id Unique identifier for the building
      */
     public WaterPlantBuilding(int id) {
-        super(id);
-    }
-    
-    @Override
-    public BuildingType getType() {
-        return BuildingType.WATER_PLANT;
+        super(id, "Water Plant", "Provides water to families", 0, 30, 3, 0, 0, 75);
     }
 }
