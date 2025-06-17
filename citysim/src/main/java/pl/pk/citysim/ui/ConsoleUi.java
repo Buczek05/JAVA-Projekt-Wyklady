@@ -39,7 +39,6 @@ public class ConsoleUi {
     private final Scanner scanner;
     private boolean running;
     private boolean waitingForCityName;
-    private boolean displayPaused;
 
     /**
      * Creates a new console UI.
@@ -99,7 +98,6 @@ public class ConsoleUi {
             System.out.println("    - income: 0-40% allowed range");
             System.out.println("    - vat: 0-25% allowed range");
             System.out.println("  stats                      - Display city statistics");
-            System.out.println("  log                        - Display recent events");
             System.out.println("  highscore                  - Display the highscore table");
             System.out.println("  exit                       - Exit the game");
             System.out.println();
@@ -175,9 +173,6 @@ public class ConsoleUi {
         }
     }
 
-    // Track the current page of the event log
-    private int currentLogPage = 0;
-    private static final int LOG_PAGE_SIZE = 10;
 
     /**
      * Processes a command from user input.
@@ -357,43 +352,6 @@ public class ConsoleUi {
                 System.out.println(cityService.getCityStats());
                 break;
 
-            case "log":
-                if (parts.length < 2) {
-                    // Default behavior - show recent events
-                    displayRecentEvents();
-                } else {
-                    String logCommand = parts[1].toLowerCase();
-
-                    if (logCommand.equals("all")) {
-                        // Show all events
-                        displayAllEvents();
-                    } else if (logCommand.startsWith("page")) {
-                        // Handle paging
-                        String[] logParts = logCommand.split("\\s+", 2);
-                        if (logParts.length > 1) {
-                            try {
-                                int page = Integer.parseInt(logParts[1]);
-                                displayEventPage(page);
-                            } catch (NumberFormatException e) {
-                                System.out.println(ConsoleFormatter.highlightError(
-                                    "ERROR: Invalid page number: " + logParts[1]));
-                            }
-                        } else {
-                            displayEventPage(currentLogPage);
-                        }
-                    } else if (logCommand.equals("next")) {
-                        // Show next page
-                        displayEventPage(currentLogPage + 1);
-                    } else if (logCommand.equals("prev") || logCommand.equals("previous")) {
-                        // Show previous page
-                        displayEventPage(Math.max(0, currentLogPage - 1));
-                    } else {
-                        System.out.println(ConsoleFormatter.highlightError(
-                            "ERROR: Unknown log command: " + logCommand));
-                        System.out.println("Available log commands: all, page <number>, next, prev");
-                    }
-                }
-                break;
 
 
             case "help":
@@ -404,10 +362,6 @@ public class ConsoleUi {
                 displayHighscores();
                 break;
 
-            case "display":
-                // In linear mode, we don't need real-time display
-                System.out.println(ConsoleFormatter.highlightInfo("Real-time display is not available in linear mode."));
-                break;
 
             case "colors":
                 if (parts.length > 1 && (parts[1].equalsIgnoreCase("on") || parts[1].equalsIgnoreCase("off"))) {
@@ -438,106 +392,12 @@ public class ConsoleUi {
             default:
                 System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown command: " + command));
                 System.out.println(ConsoleFormatter.createDivider());
-                System.out.println("Available commands: build, tax, stats, log, highscore, help, colors, continue, c, run, r, resume, exit");
+                System.out.println("Available commands: build, tax, stats, highscore, help, colors, continue, c, run, r, resume, exit");
                 System.out.println("Type 'help' for more information about commands.");
                 break;
         }
     }
 
-    /**
-     * Displays all events from the current day and the 5 most recent events.
-     */
-    private void displayRecentEvents() {
-        System.out.println(ConsoleFormatter.createHeader("CURRENT DAY EVENTS"));
-
-        // Get all events from the current day
-        List<String> currentDayEvents = cityService.getCity().getCurrentDayEvents();
-        if (currentDayEvents.isEmpty()) {
-            System.out.println("No events for the current day.");
-        } else {
-            for (String event : currentDayEvents) {
-                System.out.println(ConsoleFormatter.formatLogEntry(event));
-            }
-        }
-
-        // Also show the 5 most recent events if they're not all from the current day
-        List<String> recentEvents = cityService.getCity().getRecentEvents();
-        boolean allCurrentDay = true;
-
-        // Check if all recent events are from the current day
-        int currentDay = cityService.getCity().getDay();
-        String currentDayPrefix = "Day " + currentDay + ":";
-        for (String event : recentEvents) {
-            if (!event.startsWith(currentDayPrefix)) {
-                allCurrentDay = false;
-                break;
-            }
-        }
-
-        // If not all recent events are from the current day, show them separately
-        if (!allCurrentDay) {
-            System.out.println(ConsoleFormatter.createHeader("RECENT EVENTS (LAST 5)"));
-            for (String event : recentEvents) {
-                System.out.println(ConsoleFormatter.formatLogEntry(event));
-            }
-        }
-
-        System.out.println(ConsoleFormatter.createDivider());
-        System.out.println("Type 'log all' to view all events for the current day or 'log page <number>' to view a specific page.");
-    }
-
-    /**
-     * Displays all events in the log for the current day.
-     */
-    private void displayAllEvents() {
-        List<String> currentDayEvents = cityService.getCity().getCurrentDayEvents();
-        System.out.println(ConsoleFormatter.createHeader("CURRENT DAY EVENT LOG"));
-
-        if (currentDayEvents.isEmpty()) {
-            System.out.println("No events for today.");
-        } else {
-            for (String event : currentDayEvents) {
-                System.out.println(ConsoleFormatter.formatLogEntry(event));
-            }
-        }
-
-        System.out.println(ConsoleFormatter.createDivider());
-        System.out.println("Total events today: " + currentDayEvents.size());
-    }
-
-    /**
-     * Displays a specific page of events for the current day.
-     *
-     * @param page The page number (0-based)
-     */
-    private void displayEventPage(int page) {
-        List<String> currentDayEvents = cityService.getCity().getCurrentDayEvents();
-        int totalEvents = currentDayEvents.size();
-        int totalPages = (totalEvents + LOG_PAGE_SIZE - 1) / LOG_PAGE_SIZE;
-
-        // Ensure page is within valid range
-        page = Math.max(0, Math.min(page, totalPages - 1));
-        currentLogPage = page;
-
-        int startIndex = page * LOG_PAGE_SIZE;
-        int endIndex = Math.min(startIndex + LOG_PAGE_SIZE, totalEvents);
-
-        System.out.println(ConsoleFormatter.createHeader("CURRENT DAY EVENT LOG (PAGE " + (page + 1) + " OF " + totalPages + ")"));
-
-        if (totalEvents == 0) {
-            System.out.println("No events for today.");
-        } else if (startIndex >= totalEvents) {
-            System.out.println("Page " + (page + 1) + " is empty. Try a lower page number.");
-        } else {
-            for (int i = startIndex; i < endIndex; i++) {
-                System.out.println(ConsoleFormatter.formatLogEntry(currentDayEvents.get(i)));
-            }
-        }
-
-        System.out.println(ConsoleFormatter.createDivider());
-        System.out.println("Showing events " + (startIndex + 1) + "-" + endIndex + " of " + totalEvents);
-        System.out.println("Type 'log next' for the next page or 'log prev' for the previous page.");
-    }
 
     /**
      * Displays help information about commands.
@@ -563,13 +423,6 @@ public class ConsoleUi {
             System.out.println("  stats                         - Display city statistics");
             System.out.println();
 
-            System.out.println(ConsoleFormatter.highlightInfo("EVENT LOG COMMANDS:"));
-            System.out.println("  log                         - Display current day events");
-            System.out.println("  log all                     - Display all events for the current day");
-            System.out.println("  log page <number>           - Display specific page of current day events");
-            System.out.println("  log next                    - Display next page of current day events");
-            System.out.println("  log prev                    - Display previous page of current day events");
-            System.out.println();
 
             System.out.println(ConsoleFormatter.highlightInfo("HIGHSCORE COMMANDS:"));
             System.out.println("  highscore                   - Display the highscore table");
@@ -577,7 +430,6 @@ public class ConsoleUi {
 
 
             System.out.println(ConsoleFormatter.highlightInfo("INTERFACE COMMANDS:"));
-            System.out.println("  display <pause|resume>      - Pause/resume real-time display");
             System.out.println("  continue, c, run, r, resume - Advance to the next day");
             System.out.println("  help [command]              - Display help information");
             System.out.println("  colors <on|off>             - Enable/disable colored output");
@@ -651,25 +503,6 @@ public class ConsoleUi {
                     System.out.println("  - Recent events");
                     break;
 
-                case "log":
-                    System.out.println(ConsoleFormatter.createHeader("LOG COMMAND HELP"));
-                    System.out.println("Usage: log [option]");
-                    System.out.println();
-                    System.out.println("Displays the event log for your city.");
-                    System.out.println();
-                    System.out.println("Options:");
-                    System.out.println("  (no option) - Shows the 5 most recent events");
-                    System.out.println("  all         - Shows all events in the log");
-                    System.out.println("  page <num>  - Shows a specific page of events (10 events per page)");
-                    System.out.println("  next        - Shows the next page of events");
-                    System.out.println("  prev        - Shows the previous page of events");
-                    System.out.println();
-                    System.out.println("Examples:");
-                    System.out.println("  log          - Shows the 5 most recent events");
-                    System.out.println("  log all      - Shows all events");
-                    System.out.println("  log page 2   - Shows the second page of events");
-                    System.out.println("  log next     - Shows the next page after the current one");
-                    break;
 
 
                 case "colors":
@@ -724,21 +557,6 @@ public class ConsoleUi {
                     System.out.println("Otherwise, shows a list of all available commands.");
                     break;
 
-                case "display":
-                    System.out.println(ConsoleFormatter.createHeader("DISPLAY COMMAND HELP"));
-                    System.out.println("Usage: display <pause|resume>");
-                    System.out.println();
-                    System.out.println("Controls the real-time display of city statistics.");
-                    System.out.println("The real-time display automatically refreshes the screen with current city stats.");
-                    System.out.println();
-                    System.out.println("Options:");
-                    System.out.println("  pause  - Temporarily stops the automatic screen refresh");
-                    System.out.println("  resume - Restarts the automatic screen refresh after pausing");
-                    System.out.println();
-                    System.out.println("Examples:");
-                    System.out.println("  display pause  - Pauses the real-time display");
-                    System.out.println("  display resume - Resumes the real-time display");
-                    break;
 
                 case "highscore":
                     System.out.println(ConsoleFormatter.createHeader("HIGHSCORE COMMAND HELP"));

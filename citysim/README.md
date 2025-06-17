@@ -84,12 +84,6 @@ The game supports the following commands:
   - Example: `tax set vat 10` sets the VAT rate to 10% (allowed range: 0-25%)
 - `stats` - Displays detailed city statistics with formatted tables
 
-### Event Log
-- `log` - Displays the last 5 events that occurred in the city
-- `log all` - Displays the complete event log
-- `log page <number>` - Displays a specific page of the event log (10 events per page)
-- `log next` - Displays the next page of events
-- `log prev` - Displays the previous page of events
 
 ### Highscores
 - `highscore` - Displays the highscore table showing top players
@@ -102,10 +96,8 @@ The game features a real-time display that automatically refreshes the screen wi
 - City stats are continuously updated (every 1 second by default)
 - Critical status changes are highlighted in real-time
 - The input prompt remains responsive during updates
-- The display can be paused when you need to read detailed information
 
 ### Interface
-- `display <pause|resume>` - Pauses or resumes the real-time display
 - `pause` - Pauses the game simulation (city data does not update)
 - `resume` - Resumes the game simulation after it has been paused
 - `continue` - Resumes the game simulation (alias for 'resume')

@@ -90,7 +90,7 @@
   - Grant: Provides a financial boost to the city budget
 - Events impact budget and satisfaction
 - Some buildings (like hospitals) can mitigate negative event effects
-- All events are logged and can be viewed with the `log` command
+- All events are logged for reference
 
 ## Pause & Resume Functionality
 - The game automatically pauses when any command is entered
@@ -123,15 +123,6 @@ The game supports the following commands:
    - Shows city info, taxes, buildings, capacities, and recent events
    - Uses color-coding (if enabled) to highlight important information
 
-### Event Log Commands
-4. `log` - Displays the last 5 events that occurred in the city
-   - Events are formatted and color-coded by type (if colors are enabled)
-5. `log all` - Displays the complete event log
-   - Shows all events from the beginning of the game
-6. `log page <number>` - Displays a specific page of events
-   - Shows 10 events per page with pagination information
-7. `log next` - Displays the next page of events
-8. `log prev` - Displays the previous page of events
 
 ### Highscore Commands
 9. `highscore` - Displays the highscore table
@@ -141,21 +132,18 @@ The game supports the following commands:
 
 
 ### Interface Commands
-12. `display <pause|resume>` - Controls the real-time display
-    - `display pause` - Temporarily stops the automatic screen refresh
-    - `display resume` - Restarts the automatic screen refresh
-13. `pause` - Pauses the game simulation
+12. `pause` - Pauses the game simulation
     - Stops city data updates and random events
     - Shows "*** GAME PAUSED ***" in the UI
     - All commands remain available during pause
-14. `resume` - Resumes the game simulation after it has been paused
+13. `resume` - Resumes the game simulation after it has been paused
     - Continues city data updates and random events
-15. `help` - Displays general help information about all commands
-16. `help <command>` - Displays detailed help for a specific command
+14. `help` - Displays general help information about all commands
+15. `help <command>` - Displays detailed help for a specific command
     - Includes usage, description, examples, and parameters
-17. `colors <on|off>` - Enables or disables colored output
+16. `colors <on|off>` - Enables or disables colored output
     - Makes the interface more readable with color-coded information
-18. `exit` - Exits the game
+17. `exit` - Exits the game
 
 ## Stats Display
 The stats command shows:
@@ -195,7 +183,6 @@ When the game ends, a summary is displayed showing:
   - Automatically refreshes the screen with current city stats (every 1 second by default)
   - Critical status changes are highlighted in real-time
   - Input prompt remains responsive during updates
-  - Display pause/resume functionality for when detailed reading is needed
   - Game pause/resume functionality to stop simulation updates while maintaining UI responsiveness
   - Clear "*** GAME PAUSED ***" indicator when the game is paused
   - Cross-platform compatibility with fallback options for terminals without ANSI support
@@ -209,11 +196,6 @@ When the game ends, a summary is displayed showing:
   - Warnings in yellow
   - Errors in red
   - Important information in blue
-- Event log enhancements:
-  - Full event history access with pagination
-  - Color-coded events by type (errors, warnings, successes)
-  - Clear navigation between event pages
-  - Event counts and page information
 - Comprehensive help system:
   - General help overview of all commands
   - Detailed help for each specific command
