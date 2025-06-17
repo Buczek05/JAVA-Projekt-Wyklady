@@ -9,7 +9,6 @@ A simple city simulation game where you can build and manage a virtual city.
 - Watch your city grow day by day
 - Manage your budget and keep your citizens happy
 - Experience random events that can help or harm your city
-- Save your progress and load it later to continue your city's development
 - Balance service capacities to avoid penalties
 - Manage city growth with limited resources
 - Face increasing challenges as your city grows
@@ -91,11 +90,6 @@ The game supports the following commands:
   - Scores are based on population, budget, satisfaction, and days survived
   - Highscores are not recorded in sandbox mode
 
-### Save & Load
-- `save <filename>` - Saves the current game state to a file
-  - Example: `save mygame` saves the game to `saves/mygame.json`
-- `load <filename>` - Loads a game state from a file
-  - Example: `load mygame` loads the game from `saves/mygame.json`
 
 ### Real-Time Display
 The game features a real-time display that automatically refreshes the screen with current city statistics:
@@ -160,8 +154,7 @@ The game allows you to pause and resume the simulation at any time:
 - The game automatically pauses when you enter any command
 - When paused, the city data does not update and random events do not trigger
 - The UI displays "*** GAME PAUSED ***" when the game is paused
-- All commands remain available during pause, allowing you to check statistics or save the game
-- The game automatically pauses briefly during loading to ensure data consistency
+ - All commands remain available during pause, allowing you to check statistics or plan your next moves
 - You can resume the game by typing 'continue' or 'resume'
 
 Example usage:
@@ -180,25 +173,6 @@ Daily upkeep: $10
 Game resumed.
 ```
 
-## Save & Load Functionality
-
-The game allows you to save your progress and load it later:
-
-- Saved games are stored in JSON format in a `saves` directory (created automatically)
-- The entire city state is preserved, including day count, population, budget, buildings, etc.
-- When loading a game, the simulation pauses briefly during the loading process
-- After loading, the game continues from the exact state it was saved in
-
-Example usage:
-```
-> save mygame
-Saving game to mygame...
-Game saved successfully to mygame.json in the 'saves' directory.
-
-> load mygame
-Loading game from mygame...
-Game loaded successfully from mygame.json
-```
 
 ## Development
 
