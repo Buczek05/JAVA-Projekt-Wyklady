@@ -56,7 +56,7 @@ public class GameLoop {
                     consoleUi.handleGameOver();
                     return false;
                 } else {
-                    consoleUi.waitForSpaceToContinue();
+                    consoleUi.waitForSignalToContinue();
                     return true;
                 }
             }

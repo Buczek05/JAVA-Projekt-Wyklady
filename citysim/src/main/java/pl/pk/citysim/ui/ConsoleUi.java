@@ -842,9 +842,9 @@ public class ConsoleUi {
      * Displays the current city stats and a prompt.
      * In the linear implementation, this is called directly from the game loop.
      */
-    public void waitForSpaceToContinue() {
-        // Display city stats
+    public void waitForSignalToContinue() {
         System.out.println(cityService.getCityStats());
+        cityService.saveHighscore();
         // Show progress towards objective if not in sandbox mode
         if (!cityService.isSandboxMode()) {
             int currentDay = cityService.getCity().getDay();
