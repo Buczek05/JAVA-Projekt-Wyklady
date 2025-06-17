@@ -4,37 +4,31 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 import pl.pk.citysim.engine.GameLoop;
 import pl.pk.citysim.model.BuildingType;
+import pl.pk.citysim.model.GameConfig;
 import pl.pk.citysim.model.Highscore;
+import pl.pk.citysim.model.GameState;
 import pl.pk.citysim.service.CityService;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Console user interface for the city simulation game.
+ * Linear implementation without threads.
  */
 public class ConsoleUi {
     private static final Logger logger = Logger.getLogger(ConsoleUi.class.getName());
     private static final int MAX_HIGHSCORES = 10; // Same value as in Highscore class
-    private static final int DISPLAY_REFRESH_INTERVAL_MS = 1000; // 1 second refresh interval
 
     private final CityService cityService;
     private final GameLoop gameLoop;
     private final Scanner scanner;
-    private final BlockingQueue<Runnable> commandQueue;
-    private final AtomicBoolean running;
-
-    // Real-time display related fields
-    private final ScheduledExecutorService displayScheduler;
-    private final AtomicBoolean displayRunning;
-    private final AtomicBoolean displayPaused;
+    private boolean running;
+    private boolean waitingForPlayerName;
+    private boolean displayPaused;
 
     /**
      * Creates a new console UI.
@@ -46,21 +40,28 @@ public class ConsoleUi {
         this.cityService = cityService;
         this.gameLoop = gameLoop;
         this.scanner = new Scanner(System.in);
-        this.commandQueue = new LinkedBlockingQueue<>();
-        this.running = new AtomicBoolean(false);
-
-        // Initialize real-time display components
-        this.displayScheduler = Executors.newScheduledThreadPool(1);
-        this.displayRunning = new AtomicBoolean(false);
-        this.displayPaused = new AtomicBoolean(false);
+        this.running = false;
+        this.waitingForPlayerName = false;
     }
 
     /**
      * Starts the console UI.
      */
     public void start() {
-        if (running.compareAndSet(false, true)) {
+        if (!running) {
+            running = true;
             System.out.println("Welcome to CitySim!");
+
+            // Display game objective
+            if (!cityService.isSandboxMode()) {
+                System.out.println(ConsoleFormatter.highlightSuccess(
+                    "OBJECTIVE: Achieve the highest population possible within " + 
+                    GameConfig.MAX_DAYS + " days!"));
+                System.out.println("The game will end after " + GameConfig.MAX_DAYS + 
+                    " days, or if your city goes bankrupt or is abandoned.");
+                System.out.println();
+            }
+
             System.out.println("Available commands:");
             // Show sandbox mode indicator if applicable
             if (cityService.isSandboxMode()) {
@@ -77,46 +78,31 @@ public class ConsoleUi {
             System.out.println("  highscore                  - Display the highscore table");
             System.out.println("  save <filename>            - Save the game to a file");
             System.out.println("  load <filename>            - Load the game from a file");
-            System.out.println("  display <pause|resume>     - Pause/resume real-time display");
             System.out.println("  exit                       - Exit the game");
             System.out.println();
-            System.out.println(ConsoleFormatter.highlightInfo("Game is running in the background. Press any key to pause."));
-            System.out.println(ConsoleFormatter.highlightInfo("Type 'continue' to resume after pausing."));
+            System.out.println(ConsoleFormatter.highlightInfo("Type 'continue' to advance to the next day."));
             System.out.println();
 
-            // Start command processor thread
-            Thread processorThread = new Thread(this::processCommands);
-            processorThread.setDaemon(true);
-            processorThread.start();
-
-            // Start real-time display
-            startDisplay();
-
-            // Start key listener thread to pause on any key press
-            Thread keyListenerThread = new Thread(this::listenForKeyPress);
-            keyListenerThread.setDaemon(true);
-            keyListenerThread.start();
+            // Display initial city stats
+            System.out.println(cityService.getCityStats());
 
             // Main input loop
-            while (running.get()) {
+            while (running) {
+                System.out.print("> ");
                 String input = scanner.nextLine().trim();
 
-                // If the game is not paused and input is received, pause the game
-                if (!gameLoop.isPaused() && !input.isEmpty() && !input.equalsIgnoreCase("continue") && !input.equalsIgnoreCase("resume")) {
-                    // Pause the game first
-                    gameLoop.pause();
-                    System.out.println(ConsoleFormatter.highlightInfo("Game paused. Enter commands. Type 'continue' to resume."));
-
-                    // Then process the command
-                    try {
-                        parseCommand(input);
-                    } catch (Exception e) {
-                        System.out.println("Error processing command: " + e.getMessage());
-                        logger.log(Level.SEVERE, "Error processing command: " + input, e);
+                if (input.equalsIgnoreCase("continue") || input.equalsIgnoreCase("c") || 
+                    input.equalsIgnoreCase("run") || input.equalsIgnoreCase("r") || 
+                    input.equalsIgnoreCase("resume")) {
+                    // Advance the game by one day
+                    boolean continueGame = gameLoop.tick();
+                    if (!continueGame) {
+                        // Game over condition met
+                        break;
                     }
                 } else if (!input.isEmpty()) {
                     try {
-                        parseCommand(input);
+                        processCommand(input);
                     } catch (Exception e) {
                         System.out.println("Error processing command: " + e.getMessage());
                         logger.log(Level.SEVERE, "Error processing command: " + input, e);
@@ -127,76 +113,16 @@ public class ConsoleUi {
     }
 
     /**
-     * Listens for any key press to pause the game.
+     * This method has been removed as it's not needed in the linear implementation.
+     * The game now pauses after each day automatically and waits for user input.
      */
-    private void listenForKeyPress() {
-        try {
-            while (running.get()) {
-                if (System.in.available() > 0 && !gameLoop.isPaused()) {
-                    // Pause the game
-                    gameLoop.pause();
-                    System.out.println(ConsoleFormatter.highlightInfo("Game paused. Enter commands. Type 'continue' to resume."));
-                    System.out.print("> ");
-
-                    // Display full city statistics
-                    String cityStats = cityService.getCityStats();
-                    System.out.println(cityStats);
-
-                    // Consume the key press
-                    System.in.read();
-                    Thread.sleep(100);
-                }
-                Thread.sleep(100);
-            }
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error in key listener thread", e);
-        }
-    }
 
     /**
      * Stops the console UI.
      */
     public void stop() {
-        running.set(false);
-        stopDisplay();
-    }
-
-    /**
-     * Starts the real-time display.
-     */
-    private void startDisplay() {
-        if (displayRunning.compareAndSet(false, true)) {
-            logger.log(Level.INFO, String.format("Starting real-time display with refresh interval of %d ms", DISPLAY_REFRESH_INTERVAL_MS));
-
-            // Schedule periodic display updates
-            displayScheduler.scheduleAtFixedRate(
-                    this::refreshDisplay,
-                    0,
-                    DISPLAY_REFRESH_INTERVAL_MS,
-                    TimeUnit.MILLISECONDS
-            );
-
-            System.out.println(ConsoleFormatter.highlightInfo(
-                "Real-time display started. Type 'display pause' to pause or 'display resume' to resume."));
-        }
-    }
-
-    /**
-     * Stops the real-time display.
-     */
-    private void stopDisplay() {
-        if (displayRunning.compareAndSet(true, false)) {
-            logger.info("Stopping real-time display");
-            displayScheduler.shutdown();
-            try {
-                if (!displayScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                    displayScheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                displayScheduler.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
+        running = false;
+        System.out.println("Console UI stopped.");
     }
 
     /**
@@ -205,7 +131,8 @@ public class ConsoleUi {
      * @return true if the display was paused, false if it was already paused
      */
     private boolean pauseDisplay() {
-        if (displayPaused.compareAndSet(false, true)) {
+        if (!displayPaused) {
+            displayPaused = true;
             logger.info("Real-time display paused");
             System.out.println(ConsoleFormatter.highlightInfo("Real-time display paused. Type 'display resume' to resume."));
             return true;
@@ -219,7 +146,8 @@ public class ConsoleUi {
      * @return true if the display was resumed, false if it was not paused
      */
     private boolean resumeDisplay() {
-        if (displayPaused.compareAndSet(true, false)) {
+        if (displayPaused) {
+            displayPaused = false;
             logger.info("Real-time display resumed");
             System.out.println(ConsoleFormatter.highlightInfo("Real-time display resumed. Type 'display pause' to pause."));
             return true;
@@ -256,20 +184,16 @@ public class ConsoleUi {
 
     /**
      * Refreshes the display with current game state.
+     * In the linear implementation, this is called directly when needed.
      */
     private void refreshDisplay() {
         try {
-            if (displayRunning.get() && !displayPaused.get()) {
+            if (!displayPaused) {
                 // Clear the console
                 clearConsole();
 
                 // Display city stats
                 String cityStats = cityService.getCityStats();
-
-                // Add pause indicator if game is paused
-                if (gameLoop.isPaused()) {
-                    System.out.println(ConsoleFormatter.highlightInfo("*** GAME PAUSED ***"));
-                }
 
                 System.out.println(cityStats);
 
@@ -286,31 +210,26 @@ public class ConsoleUi {
     private int currentLogPage = 0;
     private static final int LOG_PAGE_SIZE = 10;
 
-    // Track if we're waiting for a player name for highscore
-    private boolean waitingForPlayerName = false;
-
     /**
-     * Parses a command from user input.
+     * Processes a command from user input.
      *
-     * @param input The user input to parse
+     * @param input The user input to process
      */
-    private void parseCommand(String input) {
+    private void processCommand(String input) {
         // If waiting for player name for highscore, handle that specially
         if (waitingForPlayerName) {
             waitingForPlayerName = false;
             final String playerName = input.trim().isEmpty() ? "Anonymous" : input.trim();
 
-            commandQueue.add(() -> {
-                boolean success = cityService.saveHighscore(playerName);
-                if (success) {
-                    System.out.println(ConsoleFormatter.highlightSuccess(
-                        "SUCCESS: Highscore saved for player '" + playerName + "'"));
-                    displayHighscores();
-                } else {
-                    System.out.println(ConsoleFormatter.highlightError(
-                        "ERROR: Failed to save highscore or sandbox mode is active"));
-                }
-            });
+            boolean success = cityService.saveHighscore(playerName);
+            if (success) {
+                System.out.println(ConsoleFormatter.highlightSuccess(
+                    "SUCCESS: Highscore saved for player '" + playerName + "'"));
+                displayHighscores();
+            } else {
+                System.out.println(ConsoleFormatter.highlightError(
+                    "ERROR: Failed to save highscore or sandbox mode is active"));
+            }
             return;
         }
 
@@ -322,29 +241,89 @@ public class ConsoleUi {
                 if (parts.length < 2) {
                     System.out.println(ConsoleFormatter.highlightError("ERROR: Missing building type"));
                     System.out.println(ConsoleFormatter.createDivider());
-                    System.out.println("Usage: build <building_type>");
+                    System.out.println("Usage: build <building_type> [count]");
                     System.out.println("Available building types: " + 
                             String.join(", ", getBuildingTypeNames()));
                 } else {
-                    String buildingTypeName = parts[1].toUpperCase();
+                    String[] buildParts = parts[1].split("\\s+", 2);
+                    String buildingTypeName = buildParts[0].toUpperCase();
+                    int count = 1; // Default to building one
+
+                    // Check if count is specified
+                    if (buildParts.length > 1) {
+                        try {
+                            count = Integer.parseInt(buildParts[1]);
+                            if (count <= 0) {
+                                System.out.println(ConsoleFormatter.highlightError(
+                                    "ERROR: Building count must be positive"));
+                                break;
+                            }
+                        } catch (NumberFormatException e) {
+                            System.out.println(ConsoleFormatter.highlightError(
+                                "ERROR: Invalid building count: " + buildParts[1]));
+                            break;
+                        }
+                    }
+
                     try {
                         BuildingType buildingType = BuildingType.valueOf(buildingTypeName);
-                        commandQueue.add(() -> {
-                            boolean success = cityService.buildBuilding(buildingType);
-                            if (success) {
+                        boolean success = cityService.buildBuildings(buildingType, count);
+                        if (success) {
+                            // Get the building cost information
+                            CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(buildingType);
+                            int baseCost = buildingCost.getBaseCost();
+                            int actualCost = buildingCost.getActualCost();
+                            double multiplier = buildingCost.getMultiplier();
+
+                            if (count == 1) {
                                 System.out.println(ConsoleFormatter.highlightSuccess(
                                     "SUCCESS: Built a new " + buildingType.getName()));
-                                System.out.println("Initial cost: $" + (buildingType.getUpkeep() * 10));
-                                System.out.println("Daily upkeep: $" + buildingType.getUpkeep());
                             } else {
+                                System.out.println(ConsoleFormatter.highlightSuccess(
+                                    "SUCCESS: Built " + count + " new " + buildingType.getName() + " buildings"));
+                            }
+
+                            // Show base cost and actual cost with multiplier
+                            System.out.println("Base cost per building: $" + baseCost);
+                            if (multiplier > 1.0) {
+                                System.out.println("Actual cost per building: $" + actualCost + 
+                                    " (x" + String.format("%.1f", multiplier) + " due to city size)");
+                            } else {
+                                System.out.println("Actual cost per building: $" + actualCost);
+                            }
+                            System.out.println("Daily upkeep per building: $" + buildingType.getUpkeep());
+
+                            if (count > 1) {
+                                System.out.println("Total initial cost: $" + (actualCost * count));
+                                System.out.println("Total daily upkeep: $" + (buildingType.getUpkeep() * count));
+                            }
+                        } else {
+                            // Get the building cost information
+                            CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(buildingType);
+                            int actualCost = buildingCost.getActualCost();
+                            double multiplier = buildingCost.getMultiplier();
+
+                            if (count == 1) {
                                 System.out.println(ConsoleFormatter.highlightError(
                                     "ERROR: Failed to build " + buildingType.getName() + " - not enough budget"));
-                                System.out.println("Required budget: $" + (buildingType.getUpkeep() * 10));
-                                System.out.println("Current budget: $" + cityService.getCity().getBudget());
+                                System.out.println("Required budget: $" + actualCost);
+                                if (multiplier > 1.0) {
+                                    System.out.println("Note: Cost includes x" + String.format("%.1f", multiplier) + 
+                                        " multiplier due to city size");
+                                }
+                            } else {
+                                System.out.println(ConsoleFormatter.highlightError(
+                                    "ERROR: Failed to build " + count + " " + buildingType.getName() + " buildings - not enough budget"));
+                                System.out.println("Required budget: $" + (actualCost * count));
+                                if (multiplier > 1.0) {
+                                    System.out.println("Note: Cost includes x" + String.format("%.1f", multiplier) + 
+                                        " multiplier due to city size");
+                                }
                             }
-                        });
+                            System.out.println("Current budget: $" + cityService.getCity().getBudget());
+                        }
                     } catch (IllegalArgumentException e) {
-                        System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown building type: " + parts[1]));
+                        System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown building type: " + buildingTypeName));
                         System.out.println(ConsoleFormatter.createDivider());
                         System.out.println("Available building types: " + 
                                 String.join(", ", getBuildingTypeNames()));
@@ -379,30 +358,26 @@ public class ConsoleUi {
                                     System.out.println(ConsoleFormatter.highlightError(
                                         "ERROR: Income tax rate must be between 0% and 40%"));
                                 } else {
-                                    commandQueue.add(() -> {
-                                        double oldRate = cityService.getCity().getTaxRate();
-                                        cityService.setTaxRate(taxValue);
-                                        System.out.println(ConsoleFormatter.highlightSuccess(
-                                            "SUCCESS: Income tax changed from " + 
-                                            String.format("%.1f%%", oldRate * 100) + " to " + 
-                                            String.format("%.1f%%", taxValue * 100)));
-                                        System.out.println("Note: Family arrival chance and satisfaction may change.");
-                                    });
+                                    double oldRate = cityService.getCity().getTaxRate();
+                                    cityService.setTaxRate(taxValue);
+                                    System.out.println(ConsoleFormatter.highlightSuccess(
+                                        "SUCCESS: Income tax changed from " + 
+                                        String.format("%.1f%%", oldRate * 100) + " to " + 
+                                        String.format("%.1f%%", taxValue * 100)));
+                                    System.out.println("Note: Family arrival chance and satisfaction may change.");
                                 }
                             } else if (taxType.equals("vat")) {
                                 if (taxValue < 0.0 || taxValue > 0.25) {
                                     System.out.println(ConsoleFormatter.highlightError(
                                         "ERROR: VAT rate must be between 0% and 25%"));
                                 } else {
-                                    commandQueue.add(() -> {
-                                        double oldRate = cityService.getCity().getVatRate();
-                                        cityService.setVatRate(taxValue);
-                                        System.out.println(ConsoleFormatter.highlightSuccess(
-                                            "SUCCESS: VAT changed from " + 
-                                            String.format("%.1f%%", oldRate * 100) + " to " + 
-                                            String.format("%.1f%%", taxValue * 100)));
-                                        System.out.println("Note: Family arrival chance and satisfaction may change.");
-                                    });
+                                    double oldRate = cityService.getCity().getVatRate();
+                                    cityService.setVatRate(taxValue);
+                                    System.out.println(ConsoleFormatter.highlightSuccess(
+                                        "SUCCESS: VAT changed from " + 
+                                        String.format("%.1f%%", oldRate * 100) + " to " + 
+                                        String.format("%.1f%%", taxValue * 100)));
+                                    System.out.println("Note: Family arrival chance and satisfaction may change.");
                                 }
                             } else {
                                 System.out.println(ConsoleFormatter.highlightError(
@@ -419,53 +394,39 @@ public class ConsoleUi {
                 break;
 
             case "stats":
-                commandQueue.add(() -> {
-                    System.out.println(cityService.getCityStats());
-                });
+                System.out.println(cityService.getCityStats());
                 break;
 
             case "log":
                 if (parts.length < 2) {
                     // Default behavior - show recent events
-                    commandQueue.add(() -> {
-                        displayRecentEvents();
-                    });
+                    displayRecentEvents();
                 } else {
                     String logCommand = parts[1].toLowerCase();
 
                     if (logCommand.equals("all")) {
                         // Show all events
-                        commandQueue.add(() -> {
-                            displayAllEvents();
-                        });
+                        displayAllEvents();
                     } else if (logCommand.startsWith("page")) {
                         // Handle paging
                         String[] logParts = logCommand.split("\\s+", 2);
                         if (logParts.length > 1) {
                             try {
                                 int page = Integer.parseInt(logParts[1]);
-                                commandQueue.add(() -> {
-                                    displayEventPage(page);
-                                });
+                                displayEventPage(page);
                             } catch (NumberFormatException e) {
                                 System.out.println(ConsoleFormatter.highlightError(
                                     "ERROR: Invalid page number: " + logParts[1]));
                             }
                         } else {
-                            commandQueue.add(() -> {
-                                displayEventPage(currentLogPage);
-                            });
+                            displayEventPage(currentLogPage);
                         }
                     } else if (logCommand.equals("next")) {
                         // Show next page
-                        commandQueue.add(() -> {
-                            displayEventPage(currentLogPage + 1);
-                        });
+                        displayEventPage(currentLogPage + 1);
                     } else if (logCommand.equals("prev") || logCommand.equals("previous")) {
                         // Show previous page
-                        commandQueue.add(() -> {
-                            displayEventPage(Math.max(0, currentLogPage - 1));
-                        });
+                        displayEventPage(Math.max(0, currentLogPage - 1));
                     } else {
                         System.out.println(ConsoleFormatter.highlightError(
                             "ERROR: Unknown log command: " + logCommand));
@@ -482,17 +443,15 @@ public class ConsoleUi {
                     System.out.println("Example: save mygame");
                 } else {
                     String filename = parts[1];
-                    commandQueue.add(() -> {
-                        System.out.println("Saving game to " + filename + "...");
-                        boolean success = cityService.saveGame(filename);
-                        if (success) {
-                            System.out.println(ConsoleFormatter.highlightSuccess(
-                                "SUCCESS: Game saved to " + filename + ".json in the 'saves' directory"));
-                        } else {
-                            System.out.println(ConsoleFormatter.highlightError(
-                                "ERROR: Failed to save game. Check logs for details."));
-                        }
-                    });
+                    System.out.println("Saving game to " + filename + "...");
+                    boolean success = cityService.saveGame(filename);
+                    if (success) {
+                        System.out.println(ConsoleFormatter.highlightSuccess(
+                            "SUCCESS: Game saved to " + filename + ".json in the 'saves' directory"));
+                    } else {
+                        System.out.println(ConsoleFormatter.highlightError(
+                            "ERROR: Failed to save game. Check logs for details."));
+                    }
                 }
                 break;
 
@@ -504,86 +463,39 @@ public class ConsoleUi {
                     System.out.println("Example: load mygame");
                 } else {
                     String filename = parts[1];
-                    commandQueue.add(() -> {
-                        System.out.println("Loading game from " + filename + "...");
+                    System.out.println("Loading game from " + filename + "...");
 
-                        // Pause the game loop while loading
-                        boolean wasPaused = gameLoop.isPaused();
-                        if (!wasPaused) {
-                            gameLoop.pause();
-                        }
+                    boolean success = cityService.loadGame(filename);
 
-                        boolean success = cityService.loadGame(filename);
-
-                        if (success) {
-                            System.out.println(ConsoleFormatter.highlightSuccess(
-                                "SUCCESS: Game loaded from " + filename + ".json"));
-                            System.out.println(cityService.getCityStats());
-                        } else {
-                            System.out.println(ConsoleFormatter.highlightError(
-                                "ERROR: Failed to load game. Check logs for details."));
-                        }
-
-                        // Resume the game loop if it wasn't paused before
-                        if (!wasPaused) {
-                            gameLoop.resume();
-                        }
-                    });
+                    if (success) {
+                        System.out.println(ConsoleFormatter.highlightSuccess(
+                            "SUCCESS: Game loaded from " + filename + ".json"));
+                        System.out.println(cityService.getCityStats());
+                    } else {
+                        System.out.println(ConsoleFormatter.highlightError(
+                            "ERROR: Failed to load game. Check logs for details."));
+                    }
                 }
                 break;
 
             case "help":
-                commandQueue.add(() -> {
-                    displayHelp(parts.length > 1 ? parts[1].toLowerCase() : null);
-                });
+                displayHelp(parts.length > 1 ? parts[1].toLowerCase() : null);
                 break;
 
             case "highscore":
-                commandQueue.add(() -> {
-                    displayHighscores();
-                });
+                displayHighscores();
                 break;
 
             case "display":
-                if (parts.length < 2) {
-                    System.out.println(ConsoleFormatter.highlightError("ERROR: Missing display command"));
-                    System.out.println(ConsoleFormatter.createDivider());
-                    System.out.println("Usage: display <pause|resume>");
-                    System.out.println("Examples:");
-                    System.out.println("  display pause  - Pauses the real-time display");
-                    System.out.println("  display resume - Resumes the real-time display");
-                } else {
-                    String displayCommand = parts[1].toLowerCase();
-                    if (displayCommand.equals("pause")) {
-                        commandQueue.add(() -> {
-                            if (pauseDisplay()) {
-                                // Already displays a message in pauseDisplay()
-                            } else {
-                                System.out.println(ConsoleFormatter.highlightInfo("Display is already paused."));
-                            }
-                        });
-                    } else if (displayCommand.equals("resume")) {
-                        commandQueue.add(() -> {
-                            if (resumeDisplay()) {
-                                // Already displays a message in resumeDisplay()
-                            } else {
-                                System.out.println(ConsoleFormatter.highlightInfo("Display is not paused."));
-                            }
-                        });
-                    } else {
-                        System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown display command: " + displayCommand));
-                        System.out.println("Available display commands: pause, resume");
-                    }
-                }
+                // In linear mode, we don't need real-time display
+                System.out.println(ConsoleFormatter.highlightInfo("Real-time display is not available in linear mode."));
                 break;
 
             case "colors":
                 if (parts.length > 1 && (parts[1].equalsIgnoreCase("on") || parts[1].equalsIgnoreCase("off"))) {
                     boolean enableColors = parts[1].equalsIgnoreCase("on");
-                    commandQueue.add(() -> {
-                        ConsoleFormatter.setColorsEnabled(enableColors);
-                        System.out.println("ANSI colors " + (enableColors ? "enabled" : "disabled"));
-                    });
+                    ConsoleFormatter.setColorsEnabled(enableColors);
+                    System.out.println("ANSI colors " + (enableColors ? "enabled" : "disabled"));
                 } else {
                     System.out.println("Usage: colors <on|off>");
                 }
@@ -591,86 +503,98 @@ public class ConsoleUi {
 
             case "exit":
                 System.out.println("Exiting CitySim. Goodbye!");
-                commandQueue.add(() -> {
-                    stop();
-                    System.exit(0);
-                });
+                stop();
+                System.exit(0);
                 break;
 
             case "pause":
-                commandQueue.add(() -> {
-                    if (gameLoop.pause()) {
-                        System.out.println(ConsoleFormatter.highlightInfo("Game paused. Type 'resume' to continue."));
-                    } else {
-                        System.out.println(ConsoleFormatter.highlightInfo("Game is already paused."));
-                    }
-                });
+                System.out.println(ConsoleFormatter.highlightInfo("Pause system has been removed. Use 'continue', 'c', 'run', 'r', or 'resume' to advance to the next day."));
                 break;
 
             case "resume":
             case "continue":
-                commandQueue.add(() -> {
-                    if (gameLoop.resume()) {
-                        System.out.println(ConsoleFormatter.highlightInfo("Game resumed."));
-                    } else {
-                        System.out.println(ConsoleFormatter.highlightInfo("Game is not paused."));
-                    }
-                });
+                // These commands are now handled in the main input loop
+                System.out.println(ConsoleFormatter.highlightInfo("Type 'continue', 'c', 'run', 'r', or 'resume' to advance to the next day."));
                 break;
 
             default:
                 System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown command: " + command));
                 System.out.println(ConsoleFormatter.createDivider());
-                System.out.println("Available commands: build, tax, stats, log, highscore, save, load, help, colors, pause, resume, continue, exit");
+                System.out.println("Available commands: build, tax, stats, log, highscore, save, load, help, colors, continue, c, run, r, resume, exit");
                 System.out.println("Type 'help' for more information about commands.");
                 break;
         }
     }
 
     /**
-     * Displays recent events (last 5).
+     * Displays all events from the current day and the 5 most recent events.
      */
     private void displayRecentEvents() {
-        System.out.println(ConsoleFormatter.createHeader("RECENT EVENTS"));
-        List<String> recentEvents = cityService.getCity().getRecentEvents(5);
-        if (recentEvents.isEmpty()) {
-            System.out.println("No recent events.");
+        System.out.println(ConsoleFormatter.createHeader("CURRENT DAY EVENTS"));
+
+        // Get all events from the current day
+        List<String> currentDayEvents = cityService.getCity().getCurrentDayEvents();
+        if (currentDayEvents.isEmpty()) {
+            System.out.println("No events for the current day.");
         } else {
+            for (String event : currentDayEvents) {
+                System.out.println(ConsoleFormatter.formatLogEntry(event));
+            }
+        }
+
+        // Also show the 5 most recent events if they're not all from the current day
+        List<String> recentEvents = cityService.getCity().getRecentEvents();
+        boolean allCurrentDay = true;
+
+        // Check if all recent events are from the current day
+        int currentDay = cityService.getCity().getDay();
+        String currentDayPrefix = "Day " + currentDay + ":";
+        for (String event : recentEvents) {
+            if (!event.startsWith(currentDayPrefix)) {
+                allCurrentDay = false;
+                break;
+            }
+        }
+
+        // If not all recent events are from the current day, show them separately
+        if (!allCurrentDay) {
+            System.out.println(ConsoleFormatter.createHeader("RECENT EVENTS (LAST 5)"));
             for (String event : recentEvents) {
                 System.out.println(ConsoleFormatter.formatLogEntry(event));
             }
         }
+
         System.out.println(ConsoleFormatter.createDivider());
-        System.out.println("Type 'log all' to view the full event log or 'log page <number>' to view a specific page.");
+        System.out.println("Type 'log all' to view all events for the current day or 'log page <number>' to view a specific page.");
     }
 
     /**
-     * Displays all events in the log.
+     * Displays all events in the log for the current day.
      */
     private void displayAllEvents() {
-        List<String> allEvents = cityService.getCity().getEventLog();
-        System.out.println(ConsoleFormatter.createHeader("FULL EVENT LOG"));
+        List<String> currentDayEvents = cityService.getCity().getCurrentDayEvents();
+        System.out.println(ConsoleFormatter.createHeader("CURRENT DAY EVENT LOG"));
 
-        if (allEvents.isEmpty()) {
-            System.out.println("No events in the log.");
+        if (currentDayEvents.isEmpty()) {
+            System.out.println("No events for today.");
         } else {
-            for (String event : allEvents) {
+            for (String event : currentDayEvents) {
                 System.out.println(ConsoleFormatter.formatLogEntry(event));
             }
         }
 
         System.out.println(ConsoleFormatter.createDivider());
-        System.out.println("Total events: " + allEvents.size());
+        System.out.println("Total events today: " + currentDayEvents.size());
     }
 
     /**
-     * Displays a specific page of events.
+     * Displays a specific page of events for the current day.
      *
      * @param page The page number (0-based)
      */
     private void displayEventPage(int page) {
-        List<String> allEvents = cityService.getCity().getEventLog();
-        int totalEvents = allEvents.size();
+        List<String> currentDayEvents = cityService.getCity().getCurrentDayEvents();
+        int totalEvents = currentDayEvents.size();
         int totalPages = (totalEvents + LOG_PAGE_SIZE - 1) / LOG_PAGE_SIZE;
 
         // Ensure page is within valid range
@@ -680,15 +604,15 @@ public class ConsoleUi {
         int startIndex = page * LOG_PAGE_SIZE;
         int endIndex = Math.min(startIndex + LOG_PAGE_SIZE, totalEvents);
 
-        System.out.println(ConsoleFormatter.createHeader("EVENT LOG (PAGE " + (page + 1) + " OF " + totalPages + ")"));
+        System.out.println(ConsoleFormatter.createHeader("CURRENT DAY EVENT LOG (PAGE " + (page + 1) + " OF " + totalPages + ")"));
 
         if (totalEvents == 0) {
-            System.out.println("No events in the log.");
+            System.out.println("No events for today.");
         } else if (startIndex >= totalEvents) {
             System.out.println("Page " + (page + 1) + " is empty. Try a lower page number.");
         } else {
             for (int i = startIndex; i < endIndex; i++) {
-                System.out.println(ConsoleFormatter.formatLogEntry(allEvents.get(i)));
+                System.out.println(ConsoleFormatter.formatLogEntry(currentDayEvents.get(i)));
             }
         }
 
@@ -716,17 +640,17 @@ public class ConsoleUi {
             }
 
             System.out.println(ConsoleFormatter.highlightInfo("GAME COMMANDS:"));
-            System.out.println("  build <building_type>       - Build a new building");
-            System.out.println("  tax set <income|vat> <rate> - Set tax rates (percentage)");
-            System.out.println("  stats                       - Display city statistics");
+            System.out.println("  build <building_type> [count] - Build one or more buildings");
+            System.out.println("  tax set <income|vat> <rate>   - Set tax rates (percentage)");
+            System.out.println("  stats                         - Display city statistics");
             System.out.println();
 
             System.out.println(ConsoleFormatter.highlightInfo("EVENT LOG COMMANDS:"));
-            System.out.println("  log                         - Display recent events (last 5)");
-            System.out.println("  log all                     - Display all events");
-            System.out.println("  log page <number>           - Display specific page of events");
-            System.out.println("  log next                    - Display next page of events");
-            System.out.println("  log prev                    - Display previous page of events");
+            System.out.println("  log                         - Display current day events");
+            System.out.println("  log all                     - Display all events for the current day");
+            System.out.println("  log page <number>           - Display specific page of current day events");
+            System.out.println("  log next                    - Display next page of current day events");
+            System.out.println("  log prev                    - Display previous page of current day events");
             System.out.println();
 
             System.out.println(ConsoleFormatter.highlightInfo("HIGHSCORE COMMANDS:"));
@@ -740,9 +664,7 @@ public class ConsoleUi {
 
             System.out.println(ConsoleFormatter.highlightInfo("INTERFACE COMMANDS:"));
             System.out.println("  display <pause|resume>      - Pause/resume real-time display");
-            System.out.println("  pause                       - Pause the game simulation");
-            System.out.println("  resume                      - Resume the game simulation");
-            System.out.println("  continue                    - Resume the game simulation (alias for 'resume')");
+            System.out.println("  continue, c, run, r, resume - Advance to the next day");
             System.out.println("  help [command]              - Display help information");
             System.out.println("  colors <on|off>             - Enable/disable colored output");
             System.out.println("  exit                        - Exit the game");
@@ -757,7 +679,8 @@ public class ConsoleUi {
                     System.out.println("Usage: build <building_type>");
                     System.out.println();
                     System.out.println("Constructs a new building of the specified type in your city.");
-                    System.out.println("Each building has an initial cost (10x daily upkeep) and provides different benefits.");
+                    System.out.println("Each building has an initial cost (10x daily upkeep, scaled by city size) and provides different benefits.");
+                    System.out.println("Note: As your city grows, building costs increase (up to 3x for very large cities).");
                     System.out.println();
                     System.out.println("Available building types:");
                     for (BuildingType type : BuildingType.values()) {
@@ -771,7 +694,19 @@ public class ConsoleUi {
                         } else if (type == BuildingType.WATER_PLANT || type == BuildingType.POWER_PLANT) {
                             System.out.println("    Serves up to " + type.getUtilityCapacity() + " families");
                         }
-                        System.out.println("    Initial cost: $" + (type.getUpkeep() * 10) + ", Daily upkeep: $" + type.getUpkeep());
+                        // Get the building cost information
+                        CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(type);
+                        int baseCost = buildingCost.getBaseCost();
+                        int actualCost = buildingCost.getActualCost();
+                        double multiplier = buildingCost.getMultiplier();
+
+                        if (multiplier > 1.0) {
+                            System.out.println("    Base cost: $" + baseCost + ", Actual cost: $" + actualCost + 
+                                " (x" + String.format("%.1f", multiplier) + " due to city size)");
+                        } else {
+                            System.out.println("    Initial cost: $" + actualCost);
+                        }
+                        System.out.println("    Daily upkeep: $" + type.getUpkeep());
                     }
                     break;
 
@@ -867,27 +802,24 @@ public class ConsoleUi {
                     System.out.println(ConsoleFormatter.createHeader("PAUSE COMMAND HELP"));
                     System.out.println("Usage: pause");
                     System.out.println();
-                    System.out.println("Pauses the game simulation. While paused:");
-                    System.out.println("  - City data does not update");
-                    System.out.println("  - Random events do not trigger");
-                    System.out.println("  - Time does not progress");
-                    System.out.println();
-                    System.out.println("Note: The game automatically pauses when you enter any command.");
-                    System.out.println("The UI will display '*** GAME PAUSED ***' when the game is paused.");
-                    System.out.println("Type 'continue' or 'resume' to continue the game.");
+                    System.out.println("The pause system has been removed. The game now waits for a command after each day.");
+                    System.out.println("Use 'continue', 'c', 'run', 'r', or 'resume' to advance to the next day.");
                     break;
 
                 case "resume":
                 case "continue":
-                    System.out.println(ConsoleFormatter.createHeader("RESUME/CONTINUE COMMAND HELP"));
-                    System.out.println("Usage: resume");
-                    System.out.println("   or: continue");
+                case "c":
+                case "run":
+                case "r":
+                    System.out.println(ConsoleFormatter.createHeader("CONTINUE COMMAND HELP"));
+                    System.out.println("Usage: continue");
+                    System.out.println("   or: c");
+                    System.out.println("   or: run");
+                    System.out.println("   or: r");
+                    System.out.println("   or: resume");
                     System.out.println();
-                    System.out.println("Resumes the game simulation after it has been paused.");
-                    System.out.println("This command has no effect if the game is not currently paused.");
-                    System.out.println();
-                    System.out.println("Note: The game automatically pauses when you enter any command.");
-                    System.out.println("Use this command to resume real-time simulation.");
+                    System.out.println("Advances the game to the next day.");
+                    System.out.println("After each day, the game waits for one of these commands to continue.");
                     break;
 
                 case "help":
@@ -938,21 +870,9 @@ public class ConsoleUi {
     }
 
     /**
-     * Processes commands from the command queue.
+     * This method has been removed as it's not needed in the linear implementation.
+     * Commands are processed directly in the main input loop.
      */
-    private void processCommands() {
-        while (running.get()) {
-            try {
-                Runnable command = commandQueue.take();
-                command.run();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                logger.log(Level.SEVERE, "Error executing command", e);
-            }
-        }
-    }
 
     /**
      * Gets an array of building type names.
@@ -1020,35 +940,87 @@ public class ConsoleUi {
         }
     }
 
+    // Flag to track if autosave has been done for this game session
+    private boolean autosaveDone = false;
+
+    /**
+     * Waits for the user to press the space key to continue the game.
+     * Displays the current city stats and a prompt.
+     * In the linear implementation, this is called directly from the game loop.
+     */
+    public void waitForSpaceToContinue() {
+        // Display city stats
+        System.out.println(cityService.getCityStats());
+
+        // Autosave the game only once per session
+        if (!autosaveDone) {
+            // Create a timestamp for the filename
+            String timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+            String autosaveFilename = "autosave_" + timestamp;
+            boolean saveSuccess = cityService.saveGame(autosaveFilename);
+            if (saveSuccess) {
+                System.out.println(ConsoleFormatter.highlightInfo(
+                    "Game automatically saved to " + autosaveFilename + ".json"));
+                autosaveDone = true;
+            }
+        }
+
+        // Show progress towards objective if not in sandbox mode
+        if (!cityService.isSandboxMode()) {
+            int currentDay = cityService.getCity().getDay();
+            int daysRemaining = GameConfig.MAX_DAYS - currentDay;
+            int currentPopulation = cityService.getCity().getFamilies();
+
+            System.out.println(ConsoleFormatter.highlightInfo(
+                "Day " + currentDay + " completed. " + 
+                daysRemaining + " days remaining. Current population: " + currentPopulation + " families."));
+            System.out.println(ConsoleFormatter.highlightInfo(
+                "Type 'continue', 'c', 'run', 'r', or 'resume' to advance to the next day..."));
+        } else {
+            System.out.println(ConsoleFormatter.highlightInfo(
+                "Day " + cityService.getCity().getDay() + " completed. Type 'continue', 'c', 'run', 'r', or 'resume' to advance to the next day..."));
+        }
+
+        // In the linear implementation, we don't need to wait for a key press here
+        // The main input loop in the start() method will handle this
+    }
+
     /**
      * Handles game over conditions.
      * Displays a game summary and prompts for a player name for the highscore table.
+     * In the linear implementation, this is called directly from the game loop.
      */
     public void handleGameOver() {
-        commandQueue.add(() -> {
-            // Display game summary
+        // Check if game ended due to reaching day limit
+        if (cityService.getCity().getDay() >= GameConfig.MAX_DAYS && !cityService.isSandboxMode()) {
+            System.out.println(ConsoleFormatter.highlightSuccess("GAME COMPLETED!"));
+            System.out.println("You've reached day " + GameConfig.MAX_DAYS + " with a population of " + 
+                cityService.getCity().getFamilies() + " families!");
+        } else {
+            // Display standard game over message for other end conditions
             System.out.println(ConsoleFormatter.highlightError("GAME OVER!"));
-            System.out.println(cityService.getGameSummary());
+        }
 
-            // Only prompt for name if not in sandbox mode
-            if (!cityService.isSandboxMode()) {
-                int score = cityService.calculateScore();
-                int rank = Highscore.getRank(score);
+        System.out.println(cityService.getGameSummary());
 
-                if (rank > 0 && rank <= 10) {
-                    System.out.println(ConsoleFormatter.highlightSuccess(
-                        "Congratulations! Your score of " + score + " ranks #" + rank + " on the highscore table!"));
-                    System.out.println("Enter your name for the highscore table:");
-                    waitingForPlayerName = true;
-                } else {
-                    System.out.println("Your score of " + score + " did not make the top 10 highscore table.");
-                    System.out.println("Type 'exit' to quit or start a new game.");
-                }
+        // Only prompt for name if not in sandbox mode
+        if (!cityService.isSandboxMode()) {
+            int score = cityService.calculateScore();
+            int rank = Highscore.getRank(score);
+
+            if (rank > 0 && rank <= 10) {
+                System.out.println(ConsoleFormatter.highlightSuccess(
+                    "Congratulations! Your score of " + score + " ranks #" + rank + " on the highscore table!"));
+                System.out.println("Enter your name for the highscore table:");
+                waitingForPlayerName = true;
             } else {
-                System.out.println(ConsoleFormatter.highlightInfo(
-                    "SANDBOX MODE: Game over conditions were met, but sandbox mode prevents actual game over."));
-                System.out.println("You can continue playing or type 'exit' to quit.");
+                System.out.println("Your score of " + score + " did not make the top 10 highscore table.");
+                System.out.println("Type 'exit' to quit or start a new game.");
             }
-        });
+        } else {
+            System.out.println(ConsoleFormatter.highlightInfo(
+                "SANDBOX MODE: Game over conditions were met, but sandbox mode prevents actual game over."));
+            System.out.println("You can continue playing or type 'exit' to quit.");
+        }
     }
 }

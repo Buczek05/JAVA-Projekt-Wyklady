@@ -47,3 +47,4 @@ logs/
 
 # Configuration files with sensitive data
 config.yml
+citysim/save/

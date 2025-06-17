@@ -251,13 +251,14 @@ public class ConsoleFormatter {
      * @return The formatted log entry
      */
     public static String formatLogEntry(String logEntry) {
-        // Check for event types and highlight accordingly
-        if (logEntry.contains("FIRE") || logEntry.contains("EPIDEMIC") || 
-            logEntry.contains("ECONOMIC CRISIS") || logEntry.contains("CRITICAL")) {
+        // Check for event types and highlight accordingly (case-insensitive)
+        String upperLogEntry = logEntry.toUpperCase();
+        if (upperLogEntry.contains("FIRE") || upperLogEntry.contains("EPIDEMIC") || 
+            upperLogEntry.contains("ECONOMIC CRISIS") || upperLogEntry.contains("CRITICAL")) {
             return highlightError(logEntry);
-        } else if (logEntry.contains("WARNING")) {
+        } else if (upperLogEntry.contains("WARNING")) {
             return highlightWarning(logEntry);
-        } else if (logEntry.contains("GRANT")) {
+        } else if (upperLogEntry.contains("GRANT")) {
             return highlightSuccess(logEntry);
         } else {
             return logEntry;

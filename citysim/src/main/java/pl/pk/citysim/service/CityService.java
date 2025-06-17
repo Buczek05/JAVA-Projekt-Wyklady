@@ -57,6 +57,12 @@ public class CityService {
 
         // Check for game over conditions (only if not in sandbox mode)
         if (!config.isSandboxMode()) {
+            // Day limit check - game ends after MAX_DAYS
+            if (city.getDay() >= GameConfig.MAX_DAYS) {
+                logger.log(Level.INFO, String.format("Game over: Reached day limit (%d days)", GameConfig.MAX_DAYS));
+                return false;
+            }
+
             // Bankruptcy check
             if (city.getBudget() < 0) {
                 logger.log(Level.INFO, String.format("Game over: City went bankrupt with $%d debt", -city.getBudget()));
@@ -89,21 +95,109 @@ public class CityService {
      * @return true if the building was built successfully, false otherwise
      */
     public boolean buildBuilding(BuildingType buildingType) {
+        return buildBuildings(buildingType, 1);
+    }
+
+    /**
+     * Calculates the cost of a building with the population-based multiplier.
+     *
+     * @param buildingType The type of building
+     * @return A BuildingCost object containing the cost and multiplier information
+     */
+    public BuildingCost calculateBuildingCost(BuildingType buildingType) {
+        // Base cost is 10x the upkeep
+        int baseCost = buildingType.getUpkeep() * 10;
+
+        // Scale cost with population size
+        int families = city.getFamilies();
+        double costMultiplier = 1.0;
+
+        // Apply progressive cost scaling based on population tiers
+        if (families > 200) {
+            costMultiplier = 3.0; // 200% increase for very large cities
+        } else if (families > 100) {
+            costMultiplier = 2.0; // 100% increase for large cities
+        } else if (families > 50) {
+            costMultiplier = 1.5; // 50% increase for medium cities
+        } else if (families > 20) {
+            costMultiplier = 1.2; // 20% increase for small cities
+        }
+
+        int actualCost = (int)(baseCost * costMultiplier);
+        return new BuildingCost(baseCost, actualCost, costMultiplier);
+    }
+
+    /**
+     * Class to hold building cost information.
+     */
+    public static class BuildingCost {
+        private final int baseCost;
+        private final int actualCost;
+        private final double multiplier;
+
+        public BuildingCost(int baseCost, int actualCost, double multiplier) {
+            this.baseCost = baseCost;
+            this.actualCost = actualCost;
+            this.multiplier = multiplier;
+        }
+
+        public int getBaseCost() {
+            return baseCost;
+        }
+
+        public int getActualCost() {
+            return actualCost;
+        }
+
+        public double getMultiplier() {
+            return multiplier;
+        }
+    }
+
+    /**
+     * Builds multiple buildings of the specified type.
+     *
+     * @param buildingType The type of building to build
+     * @param count The number of buildings to build
+     * @return true if all buildings were built successfully, false otherwise
+     */
+    public boolean buildBuildings(BuildingType buildingType, int count) {
         if (buildingType == null) {
             logger.log(Level.WARNING, "Cannot build null building type");
             return false;
         }
 
-        int cost = buildingType.getUpkeep() * 10; // Initial cost is 10x the upkeep
-        if (city.getBudget() < cost) {
-            logger.log(Level.INFO, String.format(
-                    "Not enough budget to build %s: need %d, have %d", 
-                    buildingType, cost, city.getBudget()));
+        if (count <= 0) {
+            logger.log(Level.WARNING, "Cannot build non-positive number of buildings: " + count);
             return false;
         }
 
-        Building building = city.addBuilding(buildingType);
-        logger.log(Level.INFO, String.format("Built new %s (ID: %d)", buildingType, building.getId()));
+        BuildingCost buildingCost = calculateBuildingCost(buildingType);
+        int costPerBuilding = buildingCost.getActualCost();
+        double costMultiplier = buildingCost.getMultiplier();
+        int totalCost = costPerBuilding * count;
+
+        if (city.getBudget() < totalCost) {
+            logger.log(Level.INFO, String.format(
+                    "Not enough budget to build %d %s: need %d, have %d", 
+                    count, buildingType, totalCost, city.getBudget()));
+            return false;
+        }
+
+        // Log the cost scaling if applicable
+        if (costMultiplier > 1.0) {
+            logger.log(Level.INFO, String.format(
+                    "Building cost scaled by %.1fx due to city size (%d families)", 
+                    costMultiplier, city.getFamilies()));
+        }
+
+        // Build all buildings
+        for (int i = 0; i < count; i++) {
+            Building building = city.addBuilding(buildingType, costPerBuilding);
+            logger.log(Level.INFO, String.format("Built new %s (ID: %d) at cost $%d (%.1fx multiplier)", 
+                    buildingType, building.getId(), costPerBuilding, costMultiplier));
+        }
+
         return true;
     }
 
@@ -166,8 +260,22 @@ public class CityService {
 
         // Basic stats
         Map<String, String> stats = new HashMap<>();
-        stats.put("Days Survived", String.valueOf(city.getDay()));
-        stats.put("Final Population", city.getFamilies() + " families");
+
+        // Show different stats based on whether the game ended due to reaching the day limit
+        if (city.getDay() >= GameConfig.MAX_DAYS && !config.isSandboxMode()) {
+            stats.put("Game Duration", GameConfig.MAX_DAYS + " days (completed)");
+            stats.put("Final Population", city.getFamilies() + " families");
+            stats.put("Population Objective", "Maximize population in " + GameConfig.MAX_DAYS + " days");
+            stats.put("Achievement", "You reached " + city.getFamilies() + " families!");
+        } else {
+            stats.put("Days Survived", String.valueOf(city.getDay()) + " of " + GameConfig.MAX_DAYS);
+            stats.put("Final Population", city.getFamilies() + " families");
+            if (!config.isSandboxMode()) {
+                stats.put("Population Objective", "Maximize population in " + GameConfig.MAX_DAYS + " days");
+                stats.put("Game Ended Early", city.getBudget() < 0 ? "Bankruptcy" : "City Abandoned");
+            }
+        }
+
         stats.put("Final Budget", "$" + city.getBudget());
         stats.put("Final Satisfaction", city.getSatisfaction() + "%");
 
@@ -246,17 +354,18 @@ public class CityService {
 
     /**
      * Calculates the score for the current game.
+     * The primary objective is to maximize population (families) within 100 days.
      * 
      * @return The calculated score
      */
     public int calculateScore() {
-        // Score formula: (families * 10) + (budget / 10) + (satisfaction * 5) + (days * 2)
+        // Score formula: (families * 50) + (budget / 20) + (satisfaction * 2)
+        // Population (families) is now the primary success metric with a much higher weight
         int families = city.getFamilies();
         int budget = city.getBudget();
         int satisfaction = city.getSatisfaction();
-        int days = city.getDay();
 
-        return (families * 10) + (budget / 10) + (satisfaction * 5) + (days * 2);
+        return (families * 50) + (budget / 20) + (satisfaction * 2);
     }
 
     /**
@@ -291,6 +400,14 @@ public class CityService {
         cityInfo.put("Satisfaction", city.getSatisfaction() + "%");
 
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createKeyValueTable("CITY STATS", cityInfo));
+
+        // Income and expenses info
+        Map<String, String> financialInfo = new HashMap<>();
+        financialInfo.put("Daily Income", "$" + city.getDailyIncome());
+        financialInfo.put("Daily Expenses", "$" + city.getDailyExpenses());
+        financialInfo.put("Net Daily Profit/Loss", "$" + (city.getDailyIncome() - city.getDailyExpenses()));
+
+        stats.append(pl.pk.citysim.ui.ConsoleFormatter.createKeyValueTable("FINANCIAL INFO", financialInfo));
 
         // Tax information
         Map<String, String> taxInfo = new HashMap<>();
@@ -433,7 +550,7 @@ public class CityService {
 
         // Recent events
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("RECENT EVENTS"));
-        List<String> recentEvents = city.getRecentEvents(5);
+        List<String> recentEvents = city.getRecentEvents();
         if (recentEvents.isEmpty()) {
             stats.append("No recent events.\n");
         } else {

@@ -1,7 +1,7 @@
 package pl.pk.citysim.model;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -14,7 +14,7 @@ import java.util.Properties;
  * Loads settings from config.yml or uses defaults if the file is not found.
  */
 public class GameConfig {
-    private static final Logger logger = LoggerFactory.getLogger(GameConfig.class);
+    private static final Logger logger = Logger.getLogger(GameConfig.class.getName());
 
     /**
      * Enum representing different difficulty levels for the game.
@@ -51,6 +51,8 @@ public class GameConfig {
     private static final boolean DEFAULT_SANDBOX_MODE = false;
     private static final int SANDBOX_INITIAL_FAMILIES = 20;
     private static final int SANDBOX_INITIAL_BUDGET = 10000;
+    // Maximum number of days for a game
+    public static final int MAX_DAYS = 100;
 
     // Configuration properties
     private final int initialFamilies;
@@ -72,12 +74,12 @@ public class GameConfig {
         if (configFile.exists()) {
             try (InputStream input = new FileInputStream(configFile)) {
                 props.load(input);
-                logger.info("Loaded configuration from config.yml");
+                logger.log(Level.INFO, "Loaded configuration from config.yml");
             } catch (IOException e) {
-                logger.warn("Failed to load config.yml, using defaults", e);
+                logger.log(Level.WARNING, "Failed to load config.yml, using defaults", e);
             }
         } else {
-            logger.info("config.yml not found, using default configuration");
+            logger.log(Level.INFO, "config.yml not found, using default configuration");
         }
 
         // Load properties with defaults
@@ -94,17 +96,10 @@ public class GameConfig {
 
         // Load difficulty setting
         String difficultyStr = props.getProperty("difficulty", DEFAULT_DIFFICULTY);
-        try {
-            this.difficulty = Difficulty.valueOf(difficultyStr.toUpperCase());
-            logger.info("Game difficulty set to: " + this.difficulty);
-        } catch (IllegalArgumentException e) {
-            logger.warn("Invalid difficulty setting: " + difficultyStr + ", using NORMAL", e);
-            this.difficulty = Difficulty.NORMAL;
-        }
+        this.difficulty = Difficulty.valueOf(difficultyStr.toUpperCase());
 
         // Load sandbox mode setting
-        this.sandboxMode = Boolean.parseBoolean(
-                props.getProperty("sandboxMode", String.valueOf(DEFAULT_SANDBOX_MODE)));
+        this.sandboxMode = Boolean.parseBoolean(props.getProperty("sandboxMode", String.valueOf(DEFAULT_SANDBOX_MODE)));
     }
 
     /**

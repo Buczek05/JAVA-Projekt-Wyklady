@@ -1,7 +1,6 @@
 package pl.pk.citysim.model;
 
-import com.fasterxml.jackson.annotation
-        .JsonCreator;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -31,6 +30,7 @@ public class GameState {
 
     private final City city;
     private final LocalDateTime savedAt;
+    private final LocalDateTime gameStartedAt;
 
     /**
      * Creates a new game state with the given city.
@@ -40,6 +40,7 @@ public class GameState {
     public GameState(City city) {
         this.city = city;
         this.savedAt = LocalDateTime.now();
+        this.gameStartedAt = LocalDateTime.now();
     }
 
     /**
@@ -48,13 +49,16 @@ public class GameState {
      *
      * @param city The city to save
      * @param savedAt The time when the game was saved
+     * @param gameStartedAt The time when the game was started
      */
     @JsonCreator
     public GameState(
             @JsonProperty("city") City city,
-            @JsonProperty("savedAt") LocalDateTime savedAt) {
+            @JsonProperty("savedAt") LocalDateTime savedAt,
+            @JsonProperty("gameStartedAt") LocalDateTime gameStartedAt) {
         this.city = city;
         this.savedAt = savedAt;
+        this.gameStartedAt = gameStartedAt != null ? gameStartedAt : savedAt; // Fallback for backward compatibility
     }
 
     /**
@@ -73,6 +77,15 @@ public class GameState {
      */
     public LocalDateTime getSavedAt() {
         return savedAt;
+    }
+
+    /**
+     * Gets the time when this game was started.
+     *
+     * @return The game start time
+     */
+    public LocalDateTime getGameStartedAt() {
+        return gameStartedAt;
     }
 
     /**
@@ -146,11 +159,32 @@ public class GameState {
         return savedAt.format(formatter);
     }
 
+    /**
+     * Gets a formatted string representation of the game start time.
+     *
+     * @return The formatted game start time
+     */
+    public String getFormattedGameStartTime() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        return gameStartedAt.format(formatter);
+    }
+
+    /**
+     * Gets a formatted string representation of the game start time for use in filenames.
+     *
+     * @return The formatted game start time for filenames
+     */
+    public String getFormattedGameStartTimeForFilename() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
+        return gameStartedAt.format(formatter);
+    }
+
     @Override
     public String toString() {
         return "GameState{" +
                 "city=" + city +
                 ", savedAt=" + getFormattedSavedTime() +
+                ", gameStartedAt=" + getFormattedGameStartTime() +
                 '}';
     }
 }

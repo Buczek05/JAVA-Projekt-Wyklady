@@ -20,6 +20,10 @@ public class City {
     private final Map<BuildingType, Integer> buildingCounts;
     private final List<String> eventLog;
 
+    // Track daily income and expenses
+    private int dailyIncome;
+    private int dailyExpenses;
+
     /**
      * Creates a new city with initial values.
      *
@@ -42,15 +46,33 @@ public class City {
             buildingCounts.put(type, 0);
         }
 
+        // Add initial buildings to provide basic services without cost
+        // (these are considered pre-existing infrastructure)
+        addInitialBuilding(BuildingType.RESIDENTIAL); // Housing for families
+        addInitialBuilding(BuildingType.SCHOOL);      // Education
+        addInitialBuilding(BuildingType.HOSPITAL);    // Healthcare
+        addInitialBuilding(BuildingType.WATER_PLANT); // Water supply
+        addInitialBuilding(BuildingType.POWER_PLANT); // Power supply
+
         // Add initial log entry
         eventLog.add("Day 1: City founded with " + initialFamilies + " families and $" + initialBudget + " budget.");
+        eventLog.add("Day 1: Initial infrastructure established (housing, school, hospital, water plant, power plant).");
     }
 
     /**
      * Advances the city simulation by one day.
+     * Clears all logs to only keep the current day's logs.
      */
     public void nextDay() {
+        // Increment the day counter
         day++;
+
+        // Clear all previous logs
+        eventLog.clear();
+
+        // Add a day separator event
+        eventLog.add("Day " + day + ": === NEW DAY ===");
+
         calculateDailyIncome();
         calculateDailyExpenses();
         checkRandomEvents();
@@ -69,11 +91,10 @@ public class City {
         double eventChance = 0.05;
 
         // Scale event chance with city size (larger cities have more events)
-        if (families > 50) {
-            eventChance = 0.07; // 7% for medium cities
-        }
         if (families > 100) {
             eventChance = 0.10; // 10% for large cities
+        } else if (families > 50) {
+            eventChance = 0.07; // 7% for medium cities
         }
 
         // Scale event chance with service quality (poor services = more negative events)
@@ -173,15 +194,16 @@ public class City {
         int damage = buildingValue * (25 + random.nextInt(51)) / 100;
 
         // Scale damage with city size (larger cities have more severe fires)
-        if (families > 50) {
-            damage = (int)(damage * 1.2); // 20% more damage for medium cities
-        }
         if (families > 100) {
             damage = (int)(damage * 1.5); // 50% more damage for large cities
+        } else if (families > 50) {
+            damage = (int)(damage * 1.2); // 20% more damage for medium cities
         }
 
         // Check if there are water plants to mitigate the damage
         int waterPlantCount = buildingCounts.getOrDefault(BuildingType.WATER_PLANT, 0);
+        int damageReduction = 0; // Initialize damage reduction to 0
+
         if (waterPlantCount > 0) {
             // Calculate water capacity
             int waterCapacity = 0;
@@ -195,11 +217,8 @@ public class City {
             double waterRatio = families > 0 ? Math.min(1.0, (double) waterCapacity / families) : 1.0;
 
             // Reduce damage based on water capacity (up to 50% reduction)
-            int damageReduction = (int)(damage * waterRatio * 0.5);
+            damageReduction = (int)(damage * waterRatio * 0.5);
             damage -= damageReduction;
-
-            eventLog.add(String.format("Day %d: FIRE! A %s caught fire. Water system helped reduce damage by $%d.", 
-                    day, affectedBuilding.getType().getName(), damageReduction));
         }
 
         // Apply effects
@@ -209,18 +228,22 @@ public class City {
         int satisfactionImpact = 5; // Base impact
         double damageToBudgetRatio = (double) damage / budget;
 
-        if (damageToBudgetRatio > 0.1) {
-            satisfactionImpact += 3; // +3 for significant damage
-        }
         if (damageToBudgetRatio > 0.2) {
-            satisfactionImpact += 5; // +5 more for severe damage
+            satisfactionImpact += 8; // +8 for severe damage (+3 and +5)
+        } else if (damageToBudgetRatio > 0.1) {
+            satisfactionImpact += 3; // +3 for significant damage
         }
 
         satisfaction -= satisfactionImpact;
 
-        // Log the event
-        eventLog.add(String.format("Day %d: FIRE! A %s caught fire, causing $%d in damages.", 
-                day, affectedBuilding.getType().getName(), damage));
+        // Log the event with appropriate message
+        if (waterPlantCount > 0) {
+            eventLog.add(String.format("Day %d: FIRE! A %s caught fire. Water system helped reduce damage by $%d. Total damage: $%d.", 
+                    day, affectedBuilding.getType().getName(), damageReduction, damage));
+        } else {
+            eventLog.add(String.format("Day %d: FIRE! A %s caught fire, causing $%d in damages.", 
+                    day, affectedBuilding.getType().getName(), damage));
+        }
     }
 
     /**
@@ -238,11 +261,10 @@ public class City {
         int baseAffectedPercentage = 10 + random.nextInt(21);
 
         // Scale affected percentage with city size (larger cities have more severe epidemics)
-        if (families > 50) {
-            baseAffectedPercentage += 5; // +5% for medium cities
-        }
         if (families > 100) {
             baseAffectedPercentage += 10; // +10% more for large cities
+        } else if (families > 50) {
+            baseAffectedPercentage += 5; // +5% for medium cities
         }
 
         // Cap at 50% maximum affected
@@ -252,11 +274,10 @@ public class City {
 
         // Calculate healthcare costs (scales with city size)
         int baseCostPerFamily = 20;
-        if (families > 50) {
-            baseCostPerFamily = 25; // Higher costs for medium cities
-        }
         if (families > 100) {
             baseCostPerFamily = 30; // Even higher costs for large cities
+        } else if (families > 50) {
+            baseCostPerFamily = 25; // Higher costs for medium cities
         }
 
         int healthcareCosts = affectedFamilies * baseCostPerFamily;
@@ -288,11 +309,10 @@ public class City {
 
         // Scale satisfaction impact with city size and affected percentage
         double severityFactor = (double) affectedFamilies / families;
-        if (severityFactor > 0.3) {
-            satisfactionImpact += 5; // +5 for severe epidemics
-        }
         if (severityFactor > 0.4) {
-            satisfactionImpact += 5; // +5 more for very severe epidemics
+            satisfactionImpact += 10; // +10 for very severe epidemics (+5 and +5)
+        } else if (severityFactor > 0.3) {
+            satisfactionImpact += 5; // +5 for severe epidemics
         }
 
         // Apply budget and satisfaction effects
@@ -319,11 +339,10 @@ public class City {
         int baseImpactPercentage = 5 + random.nextInt(11);
 
         // Scale impact with city size (larger cities have more severe economic crises)
-        if (families > 50) {
-            baseImpactPercentage += 3; // +3% for medium cities
-        }
         if (families > 100) {
             baseImpactPercentage += 5; // +5% more for large cities
+        } else if (families > 50) {
+            baseImpactPercentage += 3; // +3% for medium cities
         }
 
         // Scale impact with commercial/industrial ratio (more commercial = less severe)
@@ -357,11 +376,10 @@ public class City {
 
         // Scale satisfaction impact with severity
         double impactRatio = (double) economicImpact / budget;
-        if (impactRatio > 0.15) {
-            satisfactionImpact += 4; // +4 for severe economic impact
-        }
         if (impactRatio > 0.2) {
-            satisfactionImpact += 5; // +5 more for very severe economic impact
+            satisfactionImpact += 9; // +9 for very severe economic impact (+4 and +5)
+        } else if (impactRatio > 0.15) {
+            satisfactionImpact += 4; // +4 for severe economic impact
         }
 
         // Apply effects
@@ -390,11 +408,10 @@ public class City {
         int baseGrantPercentage = 10 + random.nextInt(11);
 
         // Scale grant with city size (larger cities get relatively smaller grants)
-        if (families > 50) {
-            baseGrantPercentage -= 2; // -2% for medium cities
-        }
         if (families > 100) {
-            baseGrantPercentage -= 3; // -3% more for large cities
+            baseGrantPercentage -= 5; // -5% total for large cities (-2% and -3%)
+        } else if (families > 50) {
+            baseGrantPercentage -= 2; // -2% for medium cities
         }
 
         // Scale grant with satisfaction (cities with lower satisfaction get more aid)
@@ -413,11 +430,10 @@ public class City {
 
         // Scale satisfaction impact with grant size relative to budget
         double grantRatio = (double) grantAmount / budget;
-        if (grantRatio > 0.15) {
-            satisfactionImpact += 2; // +2 for significant grants
-        }
         if (grantRatio > 0.2) {
-            satisfactionImpact += 3; // +3 more for very large grants
+            satisfactionImpact += 5; // +5 for very large grants (+2 and +3)
+        } else if (grantRatio > 0.15) {
+            satisfactionImpact += 2; // +2 for significant grants
         }
 
         // Apply effects
@@ -440,9 +456,10 @@ public class City {
      * Adds a new building to the city.
      *
      * @param type The type of building to add
+     * @param cost The cost of the building (with any multipliers applied)
      * @return The newly created building
      */
-    public Building addBuilding(BuildingType type) {
+    public Building addBuilding(BuildingType type, int cost) {
         int id = buildings.size() + 1;
         Building building = new Building(id, type);
         buildings.add(building);
@@ -452,7 +469,37 @@ public class City {
         buildingCounts.put(type, count + 1);
 
         // Deduct building cost from budget
-        budget -= type.getUpkeep() * 10; // Initial cost is 10x the upkeep
+        budget -= cost;
+
+        return building;
+    }
+
+    /**
+     * Adds a new building to the city with the standard cost.
+     *
+     * @param type The type of building to add
+     * @return The newly created building
+     */
+    public Building addBuilding(BuildingType type) {
+        // Use the standard cost (10x the upkeep)
+        return addBuilding(type, type.getUpkeep() * 10);
+    }
+
+    /**
+     * Adds an initial building to the city without deducting from the budget.
+     * This is used for setting up the initial infrastructure.
+     *
+     * @param type The type of building to add
+     * @return The newly created building
+     */
+    private Building addInitialBuilding(BuildingType type) {
+        int id = buildings.size() + 1;
+        Building building = new Building(id, type);
+        buildings.add(building);
+
+        // Update building count
+        int count = buildingCounts.getOrDefault(type, 0);
+        buildingCounts.put(type, count + 1);
 
         return building;
     }
@@ -584,12 +631,13 @@ public class City {
         // Total tax revenue
         int totalTaxRevenue = incomeTaxRevenue + vatRevenue;
 
+        // Set daily income
+        dailyIncome = totalTaxRevenue;
+
         // Add to budget
         budget += totalTaxRevenue;
 
         // Log tax collection with more details
-        eventLog.add(String.format("Day %d: Average family income: $%d, spending: $%d", 
-                day, baseFamilyIncome, dailySpendingPerFamily));
         eventLog.add(String.format("Day %d: Collected $%d in income tax and $%d in VAT.", 
                 day, incomeTaxRevenue, vatRevenue));
     }
@@ -729,6 +777,9 @@ public class City {
         // Total expenses
         int totalExpenses = buildingUpkeep + cityServicesCost + utilityOperationCost;
 
+        // Set daily expenses
+        dailyExpenses = totalExpenses;
+
         // Deduct from budget
         budget -= totalExpenses;
 
@@ -773,8 +824,30 @@ public class City {
 
         // Tax effects (higher taxes reduce satisfaction)
         // Income tax has more impact on satisfaction than VAT
-        satisfactionChange -= (int) (taxRate * 120); // Income tax impact
-        satisfactionChange -= (int) (vatRate * 80);  // VAT impact
+        // Increased sensitivity to tax changes relative to default rates
+        double defaultIncomeTax = 0.10; // 10% default rate
+        double defaultVAT = 0.05; // 5% default rate
+
+        // Calculate how much the current rates deviate from default
+        double incomeTaxDeviation = Math.max(0, taxRate - defaultIncomeTax);
+        double vatDeviation = Math.max(0, vatRate - defaultVAT);
+
+        // Base impact
+        int incomeTaxImpact = (int) (taxRate * 120); // Base income tax impact
+        int vatImpact = (int) (vatRate * 80);  // Base VAT impact
+
+        // Additional penalty for rates above default (progressive penalty)
+        incomeTaxImpact += (int) (incomeTaxDeviation * 180); // Stronger penalty for exceeding default
+        vatImpact += (int) (vatDeviation * 120); // Stronger penalty for exceeding default
+
+        satisfactionChange -= incomeTaxImpact;
+        satisfactionChange -= vatImpact;
+
+        // Log significant tax impacts
+        if (incomeTaxDeviation > 0 || vatDeviation > 0) {
+            eventLog.add(String.format("Day %d: High tax rates reducing satisfaction (Income Tax: -%d, VAT: -%d)", 
+                    day, incomeTaxImpact, vatImpact));
+        }
 
         // Calculate service capacities and penalties
         int educationCapacity = 0;
@@ -854,14 +927,25 @@ public class City {
         int serviceQuality = 0;
         if (educationCapacity >= families && healthcareCapacity >= families && 
             waterCapacity >= families && powerCapacity >= families) {
-            serviceQuality = Math.min(buildings.size() * 2, 20); // Cap at +20
+            serviceQuality = Math.min(buildings.size() * 2, 25); // Cap at +25 (increased from +20)
         } else {
-            serviceQuality = Math.min(buildings.size(), 10); // Cap at +10 if services are insufficient
+            serviceQuality = Math.min(buildings.size(), 15); // Cap at +15 if services are insufficient (increased from +10)
         }
         satisfactionChange += serviceQuality;
 
         // Apply change with limits
         satisfaction += satisfactionChange / 10;
+
+        // Make 80% achievable but 100% very difficult
+        if (satisfaction > 80) {
+            // Apply diminishing returns for satisfaction above 80%
+            // The closer to 100%, the harder it gets
+            double excessSatisfaction = satisfaction - 80;
+            double diminishedExcess = excessSatisfaction * (1.0 - (excessSatisfaction / 40.0));
+            satisfaction = 80 + (int)diminishedExcess;
+        }
+
+        // Ensure within limits
         if (satisfaction > 100) {
             satisfaction = 100;
         } else if (satisfaction < 0) {
@@ -928,12 +1012,11 @@ public class City {
         int serviceQuality = (int) (serviceRatio * 30); // Up to +30 for perfect services
 
         // Calculate family arrival chance
-        double arrivalChance = 0.1; // Base 10% chance
+        double arrivalChance = 0.05; // Lower base chance (5% instead of 10%)
 
-        // Bonuses
-        if (satisfaction > 50) {
-            arrivalChance += (satisfaction - 50) * 0.005; // Up to +25% for 100% satisfaction
-        }
+        // Stronger satisfaction bonus
+        // Linear scale: 0% satisfaction = 0% bonus, 100% satisfaction = +45% bonus
+        arrivalChance += satisfaction * 0.0045; // Up to +45% for 100% satisfaction
 
         if (availableJobs > families) {
             arrivalChance += 0.1; // +10% if jobs available
@@ -943,12 +1026,34 @@ public class City {
         arrivalChance += serviceRatio * 0.2; // Up to +20% for perfect services
 
         // Penalties
+        // Increased sensitivity to tax changes relative to default rates
+        double defaultIncomeTax = 0.10; // 10% default rate
+        double defaultVAT = 0.05; // 5% default rate
+
+        // Calculate how much the current rates deviate from default
+        double incomeTaxDeviation = Math.max(0, taxRate - defaultIncomeTax);
+        double vatDeviation = Math.max(0, vatRate - defaultVAT);
+
+        // Base penalties
         if (taxRate > 0.2) {
             arrivalChance -= (taxRate - 0.2) * 0.5; // Up to -40% for high taxes
         }
 
         if (vatRate > 0.1) {
             arrivalChance -= (vatRate - 0.1) * 0.3; // Up to -30% for high VAT
+        }
+
+        // Additional penalties for exceeding default rates
+        if (incomeTaxDeviation > 0) {
+            arrivalChance -= incomeTaxDeviation * 0.8; // Stronger penalty for exceeding default income tax
+            eventLog.add(String.format("Day %d: High income tax (%.1f%% above default) reducing family arrival chance", 
+                    day, incomeTaxDeviation * 100));
+        }
+
+        if (vatDeviation > 0) {
+            arrivalChance -= vatDeviation * 0.6; // Stronger penalty for exceeding default VAT
+            eventLog.add(String.format("Day %d: High VAT (%.1f%% above default) reducing family arrival chance", 
+                    day, vatDeviation * 100));
         }
 
         // Service penalties
@@ -988,8 +1093,20 @@ public class City {
         Random random = new Random();
         int newFamilies = 0;
 
-        // Try up to 5 times for new families, but respect the housing cap
-        for (int i = 0; i < 5 && newFamilies < maxNewFamilies; i++) {
+        // Determine maximum attempts based on satisfaction level
+        int maxAttempts = 5; // Default max attempts
+
+        // Increase max attempts when satisfaction is high and there's plenty of housing
+        if (satisfaction > 90 && availableHousing >= 100) {
+            maxAttempts = 50; // Up to 50 families when satisfaction > 90%
+            eventLog.add(String.format("Day %d: EXCELLENT - Very high satisfaction (>90%%) attracting many new families!", day));
+        } else if (satisfaction > 85 && availableHousing >= 100) {
+            maxAttempts = 30; // Up to 30 families when satisfaction > 85%
+            eventLog.add(String.format("Day %d: GREAT - High satisfaction (>85%%) attracting more new families!", day));
+        }
+
+        // Try up to maxAttempts times for new families, but respect the housing cap
+        for (int i = 0; i < maxAttempts && newFamilies < maxNewFamilies; i++) {
             if (random.nextDouble() < arrivalChance) {
                 newFamilies++;
             }
@@ -1000,8 +1117,11 @@ public class City {
 
         // Base departure chance based on satisfaction
         double baseDepartureChance = 0.0;
-        if (satisfaction < 30) {
-            baseDepartureChance = (30 - satisfaction) * 0.01; // Up to 30% chance for very low satisfaction
+        if (satisfaction < 50) {
+            // More aggressive departure chance based on satisfaction
+            // Up to 50% chance for very low satisfaction (0%)
+            // Linear scale: 50% satisfaction = 0% chance, 0% satisfaction = 50% chance
+            baseDepartureChance = (50 - satisfaction) * 0.01;
         }
 
         // Additional departure chance based on service shortages
@@ -1070,6 +1190,21 @@ public class City {
             eventLog.add(String.format("Day %d: %d families left the city.", day, departures));
         }
 
+        // Log satisfaction impact on population movement
+        if (newFamilies > 0 || departures > 0) {
+            String satisfactionImpact;
+            if (satisfaction >= 75) {
+                satisfactionImpact = "high satisfaction is attracting new residents";
+            } else if (satisfaction >= 50) {
+                satisfactionImpact = "moderate satisfaction is maintaining stable population";
+            } else if (satisfaction >= 25) {
+                satisfactionImpact = "low satisfaction is causing some residents to leave";
+            } else {
+                satisfactionImpact = "very low satisfaction is causing many residents to leave";
+            }
+            eventLog.add(String.format("Day %d: Current satisfaction level (%d%%) - %s.", day, satisfaction, satisfactionImpact));
+        }
+
         if (families > oldFamilies) {
             eventLog.add(String.format("Day %d: Population increased to %d families (%.1f%% housing capacity).", 
                     day, families, families * 100.0 / housingCapacity));
@@ -1085,12 +1220,34 @@ public class City {
      * @param taxRate The new income tax rate (0.0 to 0.4)
      */
     public void setTaxRate(double taxRate) {
+        double oldRate = this.taxRate;
+
         if (taxRate < 0.0) {
             this.taxRate = 0.0;
         } else if (taxRate > 0.4) {
             this.taxRate = 0.4;
         } else {
             this.taxRate = taxRate;
+        }
+
+        // Update satisfaction based on tax rate change
+        if (this.taxRate > oldRate) {
+            // Tax increase reduces satisfaction
+            int satisfactionChange = (int)((this.taxRate - oldRate) * -500);
+            satisfaction += satisfactionChange;
+            eventLog.add(String.format("Day %d: Tax increase reduced satisfaction by %d points.", day, -satisfactionChange));
+        } else if (this.taxRate < oldRate) {
+            // Tax decrease increases satisfaction
+            int satisfactionChange = (int)((oldRate - this.taxRate) * 100);
+            satisfaction += satisfactionChange;
+            eventLog.add(String.format("Day %d: Tax decrease improved satisfaction by %d points.", day, satisfactionChange));
+        }
+
+        // Ensure satisfaction stays within bounds
+        if (satisfaction > 100) {
+            satisfaction = 100;
+        } else if (satisfaction < 0) {
+            satisfaction = 0;
         }
 
         // Log income tax rate change
@@ -1134,12 +1291,34 @@ public class City {
      * @param vatRate The new VAT rate (0.0 to 0.25)
      */
     public void setVatRate(double vatRate) {
+        double oldRate = this.vatRate;
+
         if (vatRate < 0.0) {
             this.vatRate = 0.0;
         } else if (vatRate > 0.25) {
             this.vatRate = 0.25;
         } else {
             this.vatRate = vatRate;
+        }
+
+        // Update satisfaction based on VAT rate change
+        if (this.vatRate > oldRate) {
+            // VAT increase reduces satisfaction
+            int satisfactionChange = (int)((this.vatRate - oldRate) * -80);
+            satisfaction += satisfactionChange;
+            eventLog.add(String.format("Day %d: VAT increase reduced satisfaction by %d points.", day, -satisfactionChange));
+        } else if (this.vatRate < oldRate) {
+            // VAT decrease increases satisfaction
+            int satisfactionChange = (int)((oldRate - this.vatRate) * 40);
+            satisfaction += satisfactionChange;
+            eventLog.add(String.format("Day %d: VAT decrease improved satisfaction by %d points.", day, satisfactionChange));
+        }
+
+        // Ensure satisfaction stays within bounds
+        if (satisfaction > 100) {
+            satisfaction = 100;
+        } else if (satisfaction < 0) {
+            satisfaction = 0;
         }
 
         // Log VAT rate change
@@ -1166,12 +1345,55 @@ public class City {
     /**
      * Gets the most recent events (up to the specified limit).
      *
-     * @param limit The maximum number of events to return
-     * @return The most recent events
+     * @return The list of recent events
      */
-    public List<String> getRecentEvents(int limit) {
-        int size = eventLog.size();
-        int startIndex = Math.max(0, size - limit);
-        return new ArrayList<>(eventLog.subList(startIndex, size));
+    public List<String> getRecentEvents() {
+        return eventLog;
+    }
+
+    /**
+     * Gets all events from a specific day.
+     *
+     * @param day The day to get events for
+     * @return All events from the specified day
+     */
+    public List<String> getEventsByDay(int day) {
+        List<String> dayEvents = new ArrayList<>();
+        String dayPrefix = "Day " + day + ":";
+
+        for (String event : eventLog) {
+            if (event.startsWith(dayPrefix)) {
+                dayEvents.add(event);
+            }
+        }
+
+        return dayEvents;
+    }
+
+    /**
+     * Gets all events from the current day.
+     *
+     * @return All events from the current day
+     */
+    public List<String> getCurrentDayEvents() {
+        return getEventsByDay(day);
+    }
+
+    /**
+     * Gets the daily income from taxes.
+     *
+     * @return The daily income
+     */
+    public int getDailyIncome() {
+        return dailyIncome;
+    }
+
+    /**
+     * Gets the daily expenses for building upkeep and city services.
+     *
+     * @return The daily expenses
+     */
+    public int getDailyExpenses() {
+        return dailyExpenses;
     }
 }

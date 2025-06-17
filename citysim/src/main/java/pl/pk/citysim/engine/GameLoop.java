@@ -1,28 +1,21 @@
 package pl.pk.citysim.engine;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 import pl.pk.citysim.model.GameConfig;
 import pl.pk.citysim.service.CityService;
 import pl.pk.citysim.ui.ConsoleUi;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
- * Game loop that advances the city simulation at regular intervals.
+ * Game loop that advances the city simulation in a linear fashion.
  */
 public class GameLoop {
-    private static final Logger logger = LoggerFactory.getLogger(GameLoop.class);
+    private static final Logger logger = Logger.getLogger(GameLoop.class.getName());
 
     private final CityService cityService;
     private final ConsoleUi consoleUi;
     private final GameConfig config;
-    private final ScheduledExecutorService scheduler;
-    private final AtomicBoolean running;
-    private final AtomicBoolean paused;
+    private boolean running;
 
     /**
      * Creates a new game loop.
@@ -34,27 +27,19 @@ public class GameLoop {
         this.cityService = cityService;
         this.consoleUi = consoleUi;
         this.config = new GameConfig();
-        this.scheduler = Executors.newScheduledThreadPool(1);
-        this.running = new AtomicBoolean(false);
-        this.paused = new AtomicBoolean(false);
+        this.running = false;
     }
 
     /**
      * Starts the game loop.
      */
     public void start() {
-        if (running.compareAndSet(false, true)) {
-            logger.info("Starting game loop with tick interval of {} ms", config.getTickIntervalMs());
+        if (!running) {
+            running = true;
+            logger.log(Level.INFO, "Starting linear game loop");
 
-            scheduler.scheduleAtFixedRate(
-                    this::tick,
-                    0,
-                    config.getTickIntervalMs(),
-                    TimeUnit.MILLISECONDS
-            );
-
-            // Start the UI in a separate thread
-            new Thread(consoleUi::start).start();
+            // Start the UI directly (no separate thread)
+            consoleUi.start();
         }
     }
 
@@ -62,76 +47,36 @@ public class GameLoop {
      * Stops the game loop.
      */
     public void stop() {
-        if (running.compareAndSet(true, false)) {
-            logger.info("Stopping game loop");
-            scheduler.shutdown();
-            try {
-                if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                    scheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                scheduler.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
+        if (running) {
+            running = false;
+            logger.log(Level.INFO, "Stopping game loop");
         }
     }
 
     /**
      * Performs a single tick of the game loop.
+     * 
+     * @return true if the game should continue, false if game over
      */
-    private void tick() {
+    public boolean tick() {
         try {
-            if (running.get() && !paused.get()) {
+            if (running) {
                 boolean continueGame = cityService.cityTick();
-
-                // Check if game over conditions were met
                 if (!continueGame) {
-                    // Pause the game
-                    pause();
-
-                    // Notify the UI that the game is over
                     consoleUi.handleGameOver();
+                    return false;
+                } else {
+                    consoleUi.waitForSpaceToContinue();
+                    return true;
                 }
             }
+            return running;
         } catch (Exception e) {
-            logger.error("Error during game tick", e);
+            logger.log(Level.SEVERE, "Error during game tick", e);
+            return false;
         }
     }
 
-    /**
-     * Pauses the game loop.
-     * 
-     * @return true if the game was paused, false if it was already paused
-     */
-    public boolean pause() {
-        if (paused.compareAndSet(false, true)) {
-            logger.info("Game loop paused");
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Resumes the game loop.
-     * 
-     * @return true if the game was resumed, false if it was not paused
-     */
-    public boolean resume() {
-        if (paused.compareAndSet(true, false)) {
-            logger.info("Game loop resumed");
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Checks if the game loop is currently paused.
-     * 
-     * @return true if the game loop is paused, false otherwise
-     */
-    public boolean isPaused() {
-        return paused.get();
-    }
 
     /**
      * Checks if the game loop is currently running.
@@ -139,6 +84,6 @@ public class GameLoop {
      * @return true if the game loop is running, false otherwise
      */
     public boolean isRunning() {
-        return running.get();
+        return running;
     }
 }
