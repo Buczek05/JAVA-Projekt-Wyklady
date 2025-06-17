@@ -17,7 +17,7 @@ public class CityPopulationTest {
         
         // Add lots of residential buildings to ensure housing isn't a constraint
         for (int i = 0; i < 10; i++) {
-            city.addBuilding(BuildingType.RESIDENTIAL);
+            city.addBuilding(ResidentialBuilding.class);
         }
         
         // Set satisfaction to a high value using reflection
@@ -50,7 +50,7 @@ public class CityPopulationTest {
         
         // Add lots of residential buildings to ensure housing isn't a constraint
         for (int i = 0; i < 10; i++) {
-            city.addBuilding(BuildingType.RESIDENTIAL);
+            city.addBuilding(ResidentialBuilding.class);
         }
         
         // Set satisfaction to a medium-high value using reflection

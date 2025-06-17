@@ -4,7 +4,6 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 import pl.pk.citysim.model.Building;
 import pl.pk.citysim.model.Highscore;
-import pl.pk.citysim.model.BuildingType;
 import pl.pk.citysim.model.City;
 import pl.pk.citysim.model.GameConfig;
 import pl.pk.citysim.model.GameState;
@@ -31,6 +30,16 @@ public class CityService {
 
     private final City city;
     private final GameConfig config;
+    private static final Class<? extends Building>[] BUILDING_CLASSES = new Class[]{
+            ResidentialBuilding.class,
+            CommercialBuilding.class,
+            IndustrialBuilding.class,
+            ParkBuilding.class,
+            SchoolBuilding.class,
+            HospitalBuilding.class,
+            WaterPlantBuilding.class,
+            PowerPlantBuilding.class
+    };
 
     /**
      * Creates a new city service with default configuration.
@@ -98,22 +107,27 @@ public class CityService {
     /**
      * Builds a new building of the specified type.
      *
-     * @param buildingType The type of building to build
+     * @param buildingClass The type of building to build
      * @return true if the building was built successfully, false otherwise
      */
-    public boolean buildBuilding(BuildingType buildingType) {
-        return buildBuildings(buildingType, 1);
+    public boolean buildBuilding(Class<? extends Building> buildingClass) {
+        return buildBuildings(buildingClass, 1);
     }
 
     /**
      * Calculates the cost of a building with the population-based multiplier.
      *
-     * @param buildingType The type of building
+     * @param buildingClass The type of building
      * @return A BuildingCost object containing the cost and multiplier information
      */
-    public BuildingCost calculateBuildingCost(BuildingType buildingType) {
-        // Base cost is 10x the upkeep
-        int baseCost = buildingType.getUpkeep() * 10;
+    public BuildingCost calculateBuildingCost(Class<? extends Building> buildingClass) {
+        int baseCost;
+        try {
+            Building temp = buildingClass.getConstructor(int.class).newInstance(0);
+            baseCost = temp.getUpkeep() * 10;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to instantiate building", e);
+        }
 
         // Scale cost with population size
         int families = city.getFamilies();
@@ -164,12 +178,12 @@ public class CityService {
     /**
      * Builds multiple buildings of the specified type.
      *
-     * @param buildingType The type of building to build
+     * @param buildingClass The type of building to build
      * @param count The number of buildings to build
      * @return true if all buildings were built successfully, false otherwise
      */
-    public boolean buildBuildings(BuildingType buildingType, int count) {
-        if (buildingType == null) {
+    public boolean buildBuildings(Class<? extends Building> buildingClass, int count) {
+        if (buildingClass == null) {
             logger.log(Level.WARNING, "Cannot build null building type");
             return false;
         }
@@ -179,15 +193,15 @@ public class CityService {
             return false;
         }
 
-        BuildingCost buildingCost = calculateBuildingCost(buildingType);
+        BuildingCost buildingCost = calculateBuildingCost(buildingClass);
         int costPerBuilding = buildingCost.getActualCost();
         double costMultiplier = buildingCost.getMultiplier();
         int totalCost = costPerBuilding * count;
 
         if (city.getBudget() < totalCost) {
             logger.log(Level.INFO, String.format(
-                    "Not enough budget to build %d %s: need %d, have %d", 
-                    count, buildingType, totalCost, city.getBudget()));
+                    "Not enough budget to build %d %s: need %d, have %d",
+                    count, buildingClass.getSimpleName(), totalCost, city.getBudget()));
             return false;
         }
 
@@ -200,9 +214,9 @@ public class CityService {
 
         // Build all buildings
         for (int i = 0; i < count; i++) {
-            Building building = city.addBuilding(buildingType, costPerBuilding);
+            Building building = city.addBuilding(buildingClass, costPerBuilding);
             logger.log(Level.INFO, String.format("Built new %s (ID: %d) at cost $%d (%.1fx multiplier)", 
-                    buildingType, building.getId(), costPerBuilding, costMultiplier));
+                    buildingClass.getSimpleName(), building.getId(), costPerBuilding, costMultiplier));
         }
 
         return true;
@@ -303,14 +317,14 @@ public class CityService {
         // Building counts
         summary.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("BUILDINGS CONSTRUCTED"));
 
-        Map<BuildingType, Integer> buildingCounts = city.getBuildingCounts();
+        Map<String, Integer> buildingCounts = city.getBuildingCounts();
         List<String[]> buildingRows = new ArrayList<>();
 
-        for (BuildingType type : BuildingType.values()) {
-            int count = buildingCounts.getOrDefault(type, 0);
+        for (String typeName : buildingCounts.keySet()) {
+            int count = buildingCounts.get(typeName);
             if (count > 0) {
                 buildingRows.add(new String[]{
-                    type.getName(),
+                    typeName,
                     String.valueOf(count)
                 });
             }
@@ -426,17 +440,23 @@ public class CityService {
         // Building counts
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("BUILDINGS"));
 
-        Map<BuildingType, Integer> buildingCounts = city.getBuildingCounts();
+        Map<String, Integer> buildingCounts = city.getBuildingCounts();
         List<String[]> buildingRows = new ArrayList<>();
 
-        for (BuildingType type : BuildingType.values()) {
-            int count = buildingCounts.getOrDefault(type, 0);
-            if (count > 0) {
-                buildingRows.add(new String[]{
-                    type.getName(),
-                    String.valueOf(count),
-                    type.getDescription()
-                });
+        for (Class<? extends Building> cls : BUILDING_CLASSES) {
+            try {
+                Building tmp = cls.getConstructor(int.class).newInstance(0);
+                String typeName = tmp.getTypeName();
+                int count = buildingCounts.getOrDefault(typeName, 0);
+                if (count > 0) {
+                    buildingRows.add(new String[]{
+                        typeName,
+                        String.valueOf(count),
+                        tmp.getDescription()
+                    });
+                }
+            } catch (Exception e) {
+                // ignore
             }
         }
 
