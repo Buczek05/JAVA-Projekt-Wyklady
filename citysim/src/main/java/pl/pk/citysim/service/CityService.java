@@ -6,7 +6,6 @@ import pl.pk.citysim.model.Building;
 import pl.pk.citysim.model.Highscore;
 import pl.pk.citysim.model.City;
 import pl.pk.citysim.model.GameConfig;
-import pl.pk.citysim.model.GameState;
 import pl.pk.citysim.model.ResidentialBuilding;
 import pl.pk.citysim.model.CommercialBuilding;
 import pl.pk.citysim.model.IndustrialBuilding;
@@ -16,8 +15,6 @@ import pl.pk.citysim.model.ParkBuilding;
 import pl.pk.citysim.model.WaterPlantBuilding;
 import pl.pk.citysim.model.PowerPlantBuilding;
 
-import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -610,44 +607,6 @@ public class CityService {
         return status;
     }
 
-    /**
-     * Saves the current game state to a file.
-     *
-     * @param filename The name of the file to save to
-     * @return true if the game was saved successfully, false otherwise
-     */
-    public boolean saveGame(String filename) {
-        try {
-            GameState gameState = new GameState(city);
-            gameState.saveToFile(filename);
-            logger.log(Level.INFO, String.format("Game saved to %s", filename));
-            return true;
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, String.format("Failed to save game to %s", filename), e);
-            return false;
-        }
-    }
-
-    /**
-     * Loads a game state from a file and replaces the current city.
-     *
-     * @param filename The name of the file to load from
-     * @return true if the game was loaded successfully, false otherwise
-     */
-    public boolean loadGame(String filename) {
-        try {
-            GameState gameState = GameState.loadFromFile(filename);
-            replaceCity(gameState.getCity());
-            logger.log(Level.INFO, String.format("Game loaded from %s", filename));
-            return true;
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, String.format("Failed to load game from %s", filename), e);
-            return false;
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to replace city after loading game", e);
-            return false;
-        }
-    }
 
     /**
      * Gets a status indicator for a capacity ratio.
@@ -671,33 +630,4 @@ public class CityService {
         }
     }
 
-    /**
-     * Replaces the current city with a new one.
-     * This is used when loading a game.
-     *
-     * @param newCity The new city to use
-     * @throws Exception If the city could not be replaced
-     */
-    private void replaceCity(City newCity) throws Exception {
-        try {
-            // Use reflection to replace the final city field
-            Field cityField = CityService.class.getDeclaredField("city");
-            cityField.setAccessible(true);
-
-            // Remove the final modifier
-            Field modifiersField = Field.class.getDeclaredField("modifiers");
-            modifiersField.setAccessible(true);
-            modifiersField.setInt(cityField, cityField.getModifiers() & ~java.lang.reflect.Modifier.FINAL);
-
-            // Replace the city
-            cityField.set(this, newCity);
-
-            logger.log(Level.INFO, String.format(
-                    "City replaced with loaded city (day: %d, families: %d, budget: %d)",
-                    newCity.getDay(), newCity.getFamilies(), newCity.getBudget()));
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to replace city", e);
-            throw new Exception("Failed to replace city: " + e.getMessage(), e);
-        }
-    }
 }
