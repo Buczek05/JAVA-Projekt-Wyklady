@@ -102,26 +102,11 @@
   - The UI displays "*** GAME PAUSED ***" to indicate the paused state
 - All commands remain available during pause, allowing players to:
   - Check statistics and logs
-  - Save the game
-  - Plan their next moves
+- Plan their next moves
 - The game can be resumed using the 'continue' or 'resume' command
-- The game automatically pauses briefly during loading to ensure data consistency
 - Pause state is clearly indicated in the UI to avoid confusion
 - Commands that don't make sense during pause still work but have no effect until resumed
 
-## Save & Load Functionality
-- The game state can be saved to a file and loaded later
-- Saved games are stored in JSON format in a 'saves' directory
-- The entire city state is preserved, including:
-  - Day count
-  - Population (families)
-  - Budget
-  - Satisfaction level
-  - Tax rates
-  - Buildings
-  - Event log
-- When loading a game, the simulation pauses briefly during the loading process
-- After loading, the game continues from the exact state it was saved in
 
 ## Commands
 The game supports the following commands:
@@ -154,13 +139,6 @@ The game supports the following commands:
    - Indicates the current game's potential rank
    - Shows sandbox mode indicator when applicable
 
-### Save & Load Commands
-10. `save <filename>` - Saves the current game state to a file
-    - Example: `save mygame` saves the game to `saves/mygame.json`
-    - Provides clear feedback about the save operation
-11. `load <filename>` - Loads a game state from a file
-    - Example: `load mygame` loads the game from `saves/mygame.json`
-    - Shows city statistics after loading
 
 ### Interface Commands
 12. `display <pause|resume>` - Controls the real-time display

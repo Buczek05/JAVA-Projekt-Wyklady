@@ -5,7 +5,6 @@ import java.util.logging.Level;
 import pl.pk.citysim.engine.GameLoop;
 import pl.pk.citysim.model.GameConfig;
 import pl.pk.citysim.model.Highscore;
-import pl.pk.citysim.model.GameState;
 import pl.pk.citysim.service.CityService;
 import pl.pk.citysim.model.*;
 
@@ -102,8 +101,6 @@ public class ConsoleUi {
             System.out.println("  stats                      - Display city statistics");
             System.out.println("  log                        - Display recent events");
             System.out.println("  highscore                  - Display the highscore table");
-            System.out.println("  save <filename>            - Save the game to a file");
-            System.out.println("  load <filename>            - Load the game from a file");
             System.out.println("  exit                       - Exit the game");
             System.out.println();
             System.out.println(ConsoleFormatter.highlightInfo("Type 'continue' to advance to the next day."));
@@ -398,48 +395,6 @@ public class ConsoleUi {
                 }
                 break;
 
-            case "save":
-                if (parts.length < 2) {
-                    System.out.println(ConsoleFormatter.highlightError("ERROR: Missing filename"));
-                    System.out.println(ConsoleFormatter.createDivider());
-                    System.out.println("Usage: save <filename>");
-                    System.out.println("Example: save mygame");
-                } else {
-                    String filename = parts[1];
-                    System.out.println("Saving game to " + filename + "...");
-                    boolean success = cityService.saveGame(filename);
-                    if (success) {
-                        System.out.println(ConsoleFormatter.highlightSuccess(
-                            "SUCCESS: Game saved to " + filename + ".json in the 'saves' directory"));
-                    } else {
-                        System.out.println(ConsoleFormatter.highlightError(
-                            "ERROR: Failed to save game. Check logs for details."));
-                    }
-                }
-                break;
-
-            case "load":
-                if (parts.length < 2) {
-                    System.out.println(ConsoleFormatter.highlightError("ERROR: Missing filename"));
-                    System.out.println(ConsoleFormatter.createDivider());
-                    System.out.println("Usage: load <filename>");
-                    System.out.println("Example: load mygame");
-                } else {
-                    String filename = parts[1];
-                    System.out.println("Loading game from " + filename + "...");
-
-                    boolean success = cityService.loadGame(filename);
-
-                    if (success) {
-                        System.out.println(ConsoleFormatter.highlightSuccess(
-                            "SUCCESS: Game loaded from " + filename + ".json"));
-                        System.out.println(cityService.getCityStats());
-                    } else {
-                        System.out.println(ConsoleFormatter.highlightError(
-                            "ERROR: Failed to load game. Check logs for details."));
-                    }
-                }
-                break;
 
             case "help":
                 displayHelp(parts.length > 1 ? parts[1].toLowerCase() : null);
@@ -483,7 +438,7 @@ public class ConsoleUi {
             default:
                 System.out.println(ConsoleFormatter.highlightError("ERROR: Unknown command: " + command));
                 System.out.println(ConsoleFormatter.createDivider());
-                System.out.println("Available commands: build, tax, stats, log, highscore, save, load, help, colors, continue, c, run, r, resume, exit");
+                System.out.println("Available commands: build, tax, stats, log, highscore, help, colors, continue, c, run, r, resume, exit");
                 System.out.println("Type 'help' for more information about commands.");
                 break;
         }
@@ -620,10 +575,6 @@ public class ConsoleUi {
             System.out.println("  highscore                   - Display the highscore table");
             System.out.println();
 
-            System.out.println(ConsoleFormatter.highlightInfo("SAVE/LOAD COMMANDS:"));
-            System.out.println("  save <filename>             - Save the game to a file");
-            System.out.println("  load <filename>             - Load the game from a file");
-            System.out.println();
 
             System.out.println(ConsoleFormatter.highlightInfo("INTERFACE COMMANDS:"));
             System.out.println("  display <pause|resume>      - Pause/resume real-time display");
@@ -720,27 +671,6 @@ public class ConsoleUi {
                     System.out.println("  log next     - Shows the next page after the current one");
                     break;
 
-                case "save":
-                    System.out.println(ConsoleFormatter.createHeader("SAVE COMMAND HELP"));
-                    System.out.println("Usage: save <filename>");
-                    System.out.println();
-                    System.out.println("Saves the current game state to a file in the 'saves' directory.");
-                    System.out.println("The .json extension will be added automatically if not provided.");
-                    System.out.println();
-                    System.out.println("Example:");
-                    System.out.println("  save mygame  - Saves the game to 'saves/mygame.json'");
-                    break;
-
-                case "load":
-                    System.out.println(ConsoleFormatter.createHeader("LOAD COMMAND HELP"));
-                    System.out.println("Usage: load <filename>");
-                    System.out.println();
-                    System.out.println("Loads a game state from a file in the 'saves' directory.");
-                    System.out.println("The .json extension will be added automatically if not provided.");
-                    System.out.println();
-                    System.out.println("Example:");
-                    System.out.println("  load mygame  - Loads the game from 'saves/mygame.json'");
-                    break;
 
                 case "colors":
                     System.out.println(ConsoleFormatter.createHeader("COLORS COMMAND HELP"));
@@ -906,8 +836,6 @@ public class ConsoleUi {
         }
     }
 
-    // Flag to track if autosave has been done for this game session
-    private boolean autosaveDone = false;
 
     /**
      * Waits for the user to press the space key to continue the game.
@@ -917,31 +845,6 @@ public class ConsoleUi {
     public void waitForSpaceToContinue() {
         // Display city stats
         System.out.println(cityService.getCityStats());
-
-        // Autosave the game only once per session
-        if (!autosaveDone) {
-            // Create a timestamp for the filename
-            String timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-            String autosaveFilename = "autosave_" + timestamp;
-            boolean saveSuccess = cityService.saveGame(autosaveFilename);
-            if (saveSuccess) {
-                System.out.println(ConsoleFormatter.highlightInfo(
-                    "Game automatically saved to " + autosaveFilename + ".json"));
-
-                // Also save to highscore table if not in sandbox mode
-                if (!cityService.isSandboxMode()) {
-                    String cityName = cityService.getCity().getName();
-                    boolean highscoreSuccess = cityService.saveHighscore();
-                    if (highscoreSuccess) {
-                        System.out.println(ConsoleFormatter.highlightInfo(
-                            "Score for " + cityName + " saved to highscore table"));
-                    }
-                }
-
-                autosaveDone = true;
-            }
-        }
-
         // Show progress towards objective if not in sandbox mode
         if (!cityService.isSandboxMode()) {
             int currentDay = cityService.getCity().getDay();
