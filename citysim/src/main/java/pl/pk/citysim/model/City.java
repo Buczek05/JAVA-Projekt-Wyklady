@@ -12,6 +12,7 @@ import pl.pk.citysim.model.*;
  * Represents the city in the simulation.
  */
 public class City {
+    private String name;
     private int day;
     private int families; // Kept for backward compatibility
     private FamilyManager familyManager;
@@ -38,6 +39,7 @@ public class City {
      * Default constructor for Jackson deserialization.
      */
     public City() {
+        this.name = "Unnamed City";
         this.day = 1;
         this.families = 0;
         this.familyManager = new FamilyManager();
@@ -69,6 +71,18 @@ public class City {
      * @param initialBudget Initial budget
      */
     public City(int initialFamilies, int initialBudget) {
+        this("Unnamed City", initialFamilies, initialBudget);
+    }
+
+    /**
+     * Creates a new city with initial values and a name.
+     *
+     * @param name The name of the city
+     * @param initialFamilies Initial number of families
+     * @param initialBudget Initial budget
+     */
+    public City(String name, int initialFamilies, int initialBudget) {
+        this.name = name;
         this.day = 1;
         this.families = initialFamilies; // Kept for backward compatibility
         this.familyManager = new FamilyManager(initialFamilies);
@@ -517,7 +531,7 @@ public class City {
     /**
      * Adds a new building to the city.
      *
-     * @param type The type of building to add
+     * @param clazz The class of building to add
      * @param cost The cost of the building (with any multipliers applied)
      * @return The newly created building
      */
@@ -541,7 +555,7 @@ public class City {
     /**
      * Adds a new building to the city with the standard cost.
      *
-     * @param type The type of building to add
+     * @param clazz The class of building to add
      * @return The newly created building
      */
     public Building addBuilding(Class<? extends Building> clazz) {
@@ -557,7 +571,7 @@ public class City {
      * Adds an initial building to the city without deducting from the budget.
      * This is used for setting up the initial infrastructure.
      *
-     * @param type The type of building to add
+     * @param clazz The class of building to add
      * @return The newly created building
      */
     private Building addInitialBuilding(Class<? extends Building> clazz) {
@@ -868,7 +882,8 @@ public class City {
     }
 
     /**
-     * Updates the city's satisfaction level based on buildings, tax rates, and services.
+     * Updates the city's satisfaction level
+     * based on buildings, tax rates, and services.
      */
     private void updateSatisfaction() {
         // Base satisfaction change
@@ -1479,5 +1494,23 @@ public class City {
 
     public int getDailyExpenses() {
         return dailyExpenses;
+    }
+
+    /**
+     * Gets the name of the city.
+     *
+     * @return The city name
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Sets the name of the city.
+     *
+     * @param name The new city name
+     */
+    public void setName(String name) {
+        this.name = name;
     }
 }

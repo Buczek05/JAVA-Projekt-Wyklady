@@ -25,7 +25,7 @@ public class Highscore implements Comparable<Highscore> {
     private static final int MAX_HIGHSCORES = 10;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final String playerName;
+    private final String cityName;
     private final int score;
     private final LocalDateTime achievedAt;
     private final int families;
@@ -36,15 +36,15 @@ public class Highscore implements Comparable<Highscore> {
     /**
      * Creates a new highscore entry.
      *
-     * @param playerName The name of the player
+     * @param cityName The name of the city
      * @param score The score achieved
      * @param families The number of families in the city
      * @param budget The city budget
      * @param satisfaction The city satisfaction level
      * @param days The number of days the city survived
      */
-    public Highscore(String playerName, int score, int families, int budget, int satisfaction, int days) {
-        this.playerName = playerName;
+    public Highscore(String cityName, int score, int families, int budget, int satisfaction, int days) {
+        this.cityName = cityName;
         this.score = score;
         this.families = families;
         this.budget = budget;
@@ -56,7 +56,7 @@ public class Highscore implements Comparable<Highscore> {
     /**
      * Creates a new highscore entry with a specified achievement time.
      *
-     * @param playerName The name of the player
+     * @param cityName The name of the city
      * @param score The score achieved
      * @param families The number of families in the city
      * @param budget The city budget
@@ -65,14 +65,14 @@ public class Highscore implements Comparable<Highscore> {
      * @param achievedAt The time when the score was achieved
      */
     public Highscore(
-            String playerName,
+            String cityName,
             int score,
             int families,
             int budget,
             int satisfaction,
             int days,
             LocalDateTime achievedAt) {
-        this.playerName = playerName;
+        this.cityName = cityName;
         this.score = score;
         this.families = families;
         this.budget = budget;
@@ -85,11 +85,11 @@ public class Highscore implements Comparable<Highscore> {
      * Calculates a score based on city statistics.
      *
      * @param city The city to calculate the score for
-     * @param playerName The name of the player
      * @return A new Highscore object with the calculated score
      */
-    public static Highscore calculateScore(City city, String playerName) {
+    public static Highscore calculateScore(City city) {
         // Score formula: (families * 10) + (budget / 10) + (satisfaction * 5) + (days * 2)
+        String cityName = city.getName();
         int families = city.getFamilies();
         int budget = city.getBudget();
         int satisfaction = city.getSatisfaction();
@@ -97,7 +97,7 @@ public class Highscore implements Comparable<Highscore> {
 
         int score = (families * 10) + (budget / 10) + (satisfaction * 5) + (days * 2);
 
-        return new Highscore(playerName, score, families, budget, satisfaction, days);
+        return new Highscore(cityName, score, families, budget, satisfaction, days);
     }
 
     /**
@@ -132,9 +132,9 @@ public class Highscore implements Comparable<Highscore> {
             File file = new File(highscoresDir.toFile(), HIGHSCORES_FILE);
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
                 for (Highscore h : highscores) {
-                    // Format: playerName,score,families,budget,satisfaction,days,achievedAt
+                    // Format: cityName,score,families,budget,satisfaction,days,achievedAt
                     writer.write(String.format("%s,%d,%d,%d,%d,%d,%s%n",
-                            h.playerName,
+                            h.cityName,
                             h.score,
                             h.families,
                             h.budget,
@@ -170,10 +170,19 @@ public class Highscore implements Comparable<Highscore> {
             String line;
             while ((line = reader.readLine()) != null) {
                 try {
-                    // Format: playerName,score,families,budget,satisfaction,days,achievedAt
                     String[] parts = line.split(",");
-                    if (parts.length >= 7) {
-                        String playerName = parts[0];
+                    if (parts.length >= 8) {
+                        String cityName = parts[1];
+                        int score = Integer.parseInt(parts[2]);
+                        int families = Integer.parseInt(parts[3]);
+                        int budget = Integer.parseInt(parts[4]);
+                        int satisfaction = Integer.parseInt(parts[5]);
+                        int days = Integer.parseInt(parts[6]);
+                        LocalDateTime achievedAt = LocalDateTime.parse(parts[7], DATE_FORMATTER);
+
+                        highscores.add(new Highscore(cityName, score, families, budget, satisfaction, days, achievedAt));
+                    } else if (parts.length >= 7) {
+                        String cityName = parts[0];
                         int score = Integer.parseInt(parts[1]);
                         int families = Integer.parseInt(parts[2]);
                         int budget = Integer.parseInt(parts[3]);
@@ -181,7 +190,7 @@ public class Highscore implements Comparable<Highscore> {
                         int days = Integer.parseInt(parts[5]);
                         LocalDateTime achievedAt = LocalDateTime.parse(parts[6], DATE_FORMATTER);
 
-                        highscores.add(new Highscore(playerName, score, families, budget, satisfaction, days, achievedAt));
+                        highscores.add(new Highscore(cityName, score, families, budget, satisfaction, days, achievedAt));
                     }
                 } catch (Exception e) {
                     System.err.println("Error parsing highscore line: " + line + " - " + e.getMessage());
@@ -225,13 +234,14 @@ public class Highscore implements Comparable<Highscore> {
         return -1;
     }
 
+
     /**
-     * Gets the player name.
+     * Gets the city name.
      *
-     * @return The player name
+     * @return The city name
      */
-    public String getPlayerName() {
-        return playerName;
+    public String getCityName() {
+        return cityName;
     }
 
     /**
@@ -306,6 +316,6 @@ public class Highscore implements Comparable<Highscore> {
     @Override
     public String toString() {
         return String.format("%s: %d points (Families: %d, Budget: $%d, Satisfaction: %d%%, Days: %d) - %s",
-                playerName, score, families, budget, satisfaction, days, getFormattedAchievedTime());
+                cityName, score, families, budget, satisfaction, days, getFormattedAchievedTime());
     }
 }

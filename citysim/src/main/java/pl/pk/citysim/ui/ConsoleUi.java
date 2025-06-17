@@ -39,7 +39,7 @@ public class ConsoleUi {
     private final GameLoop gameLoop;
     private final Scanner scanner;
     private boolean running;
-    private boolean waitingForPlayerName;
+    private boolean waitingForCityName;
     private boolean displayPaused;
 
     /**
@@ -53,7 +53,7 @@ public class ConsoleUi {
         this.gameLoop = gameLoop;
         this.scanner = new Scanner(System.in);
         this.running = false;
-        this.waitingForPlayerName = false;
+        this.waitingForCityName = true; // Start by waiting for city name
     }
 
     /**
@@ -63,6 +63,20 @@ public class ConsoleUi {
         if (!running) {
             running = true;
             System.out.println("Welcome to CitySim!");
+
+            // Ask for city name
+            if (waitingForCityName) {
+                System.out.println("Please enter a name for your city:");
+                System.out.print("> ");
+                String cityName = scanner.nextLine().trim();
+                if (cityName.isEmpty()) {
+                    cityName = "Unnamed City";
+                }
+                cityService.getCity().setName(cityName);
+                waitingForCityName = false;
+                System.out.println("City name set to: " + cityName);
+                System.out.println();
+            }
 
             // Display game objective
             if (!cityService.isSandboxMode()) {
@@ -138,36 +152,6 @@ public class ConsoleUi {
     }
 
     /**
-     * Pauses the real-time display.
-     * 
-     * @return true if the display was paused, false if it was already paused
-     */
-    private boolean pauseDisplay() {
-        if (!displayPaused) {
-            displayPaused = true;
-            logger.info("Real-time display paused");
-            System.out.println(ConsoleFormatter.highlightInfo("Real-time display paused. Type 'display resume' to resume."));
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Resumes the real-time display.
-     * 
-     * @return true if the display was resumed, false if it was not paused
-     */
-    private boolean resumeDisplay() {
-        if (displayPaused) {
-            displayPaused = false;
-            logger.info("Real-time display resumed");
-            System.out.println(ConsoleFormatter.highlightInfo("Real-time display resumed. Type 'display pause' to pause."));
-            return true;
-        }
-        return false;
-    }
-
-    /**
      * Clears the console screen.
      * Uses ANSI escape codes if supported, otherwise falls back to printing newlines.
      */
@@ -194,30 +178,6 @@ public class ConsoleUi {
         }
     }
 
-    /**
-     * Refreshes the display with current game state.
-     * In the linear implementation, this is called directly when needed.
-     */
-    private void refreshDisplay() {
-        try {
-            if (!displayPaused) {
-                // Clear the console
-                clearConsole();
-
-                // Display city stats
-                String cityStats = cityService.getCityStats();
-
-                System.out.println(cityStats);
-
-                // Show input prompt
-                System.out.print("> ");
-                System.out.flush(); // Ensure prompt is displayed immediately
-            }
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error refreshing display", e);
-        }
-    }
-
     // Track the current page of the event log
     private int currentLogPage = 0;
     private static final int LOG_PAGE_SIZE = 10;
@@ -228,22 +188,6 @@ public class ConsoleUi {
      * @param input The user input to process
      */
     private void processCommand(String input) {
-        // If waiting for player name for highscore, handle that specially
-        if (waitingForPlayerName) {
-            waitingForPlayerName = false;
-            final String playerName = input.trim().isEmpty() ? "Anonymous" : input.trim();
-
-            boolean success = cityService.saveHighscore(playerName);
-            if (success) {
-                System.out.println(ConsoleFormatter.highlightSuccess(
-                    "SUCCESS: Highscore saved for player '" + playerName + "'"));
-                displayHighscores();
-            } else {
-                System.out.println(ConsoleFormatter.highlightError(
-                    "ERROR: Failed to save highscore or sandbox mode is active"));
-            }
-            return;
-        }
 
         String[] parts = input.split("\\s+", 2);
         String command = parts[0].toLowerCase();
@@ -321,8 +265,7 @@ public class ConsoleUi {
                                 System.out.println("Total daily upkeep: $" + (newInstance(buildingClass).getUpkeep() * count));
                             }
                         } else {
-                            // Get the building cost information
-                            CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(buildingClass);
+                            // Use the building cost information already calculated
                             int actualCost = buildingCost.getActualCost();
                             double multiplier = buildingCost.getMultiplier();
 
@@ -928,7 +871,7 @@ public class ConsoleUi {
                 Highscore h = highscores.get(i);
                 rows.add(new String[] {
                     String.valueOf(i + 1),
-                    h.getPlayerName(),
+                    h.getCityName(),
                     String.valueOf(h.getScore()),
                     h.getFamilies() + " families",
                     "$" + h.getBudget(),
@@ -939,7 +882,7 @@ public class ConsoleUi {
             }
 
             System.out.println(ConsoleFormatter.createTable(
-                new String[] {"Rank", "Player", "Score", "Population", "Budget", "Satisfaction", "Days", "Date"},
+                new String[] {"Rank", "City", "Score", "Population", "Budget", "Satisfaction", "Days", "Date"},
                 rows
             ));
         }
@@ -984,6 +927,17 @@ public class ConsoleUi {
             if (saveSuccess) {
                 System.out.println(ConsoleFormatter.highlightInfo(
                     "Game automatically saved to " + autosaveFilename + ".json"));
+
+                // Also save to highscore table if not in sandbox mode
+                if (!cityService.isSandboxMode()) {
+                    String cityName = cityService.getCity().getName();
+                    boolean highscoreSuccess = cityService.saveHighscore();
+                    if (highscoreSuccess) {
+                        System.out.println(ConsoleFormatter.highlightInfo(
+                            "Score for " + cityName + " saved to highscore table"));
+                    }
+                }
+
                 autosaveDone = true;
             }
         }
@@ -1034,8 +988,15 @@ public class ConsoleUi {
             if (rank > 0 && rank <= 10) {
                 System.out.println(ConsoleFormatter.highlightSuccess(
                     "Congratulations! Your score of " + score + " ranks #" + rank + " on the highscore table!"));
-                System.out.println("Enter your name for the highscore table:");
-                waitingForPlayerName = true;
+                boolean success = cityService.saveHighscore();
+                if (success) {
+                    System.out.println(ConsoleFormatter.highlightSuccess(
+                        "SUCCESS: Highscore saved!"));
+                    displayHighscores();
+                } else {
+                    System.out.println(ConsoleFormatter.highlightError(
+                        "ERROR: Failed to save highscore or sandbox mode is active"));
+                }
             } else {
                 System.out.println("Your score of " + score + " did not make the top 10 highscore table.");
                 System.out.println("Type 'exit' to quit or start a new game.");

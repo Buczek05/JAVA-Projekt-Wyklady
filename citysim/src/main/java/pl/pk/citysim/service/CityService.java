@@ -12,6 +12,7 @@ import pl.pk.citysim.model.CommercialBuilding;
 import pl.pk.citysim.model.IndustrialBuilding;
 import pl.pk.citysim.model.SchoolBuilding;
 import pl.pk.citysim.model.HospitalBuilding;
+import pl.pk.citysim.model.ParkBuilding;
 import pl.pk.citysim.model.WaterPlantBuilding;
 import pl.pk.citysim.model.PowerPlantBuilding;
 
@@ -392,16 +393,15 @@ public class CityService {
     /**
      * Saves the current game score to the highscores file.
      * 
-     * @param playerName The name of the player
      * @return true if the score was saved successfully, false otherwise
      */
-    public boolean saveHighscore(String playerName) {
+    public boolean saveHighscore() {
         // Don't save highscores in sandbox mode
         if (config.isSandboxMode()) {
             return false;
         }
 
-        Highscore highscore = Highscore.calculateScore(city, playerName);
+        Highscore highscore = Highscore.calculateScore(city);
         return Highscore.saveHighscore(highscore);
     }
 

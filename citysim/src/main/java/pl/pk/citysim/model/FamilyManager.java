@@ -12,19 +12,11 @@ public class FamilyManager {
     private List<Family> families;
     private Random random;
 
-    /**
-     * Default constructor for Jackson deserialization.
-     */
     public FamilyManager() {
         this.families = new ArrayList<>();
         this.random = new Random();
     }
 
-    /**
-     * Creates a new family manager with the specified number of initial families.
-     *
-     * @param initialFamilies The initial number of families
-     */
     public FamilyManager(int initialFamilies) {
         this.families = new ArrayList<>();
         this.random = new Random();
@@ -35,41 +27,20 @@ public class FamilyManager {
         }
     }
 
-    /**
-     * Gets the total number of families.
-     *
-     * @return The number of families
-     */
     public int getFamiliesCount() {
         return families.size();
     }
 
-    /**
-     * Gets the list of families.
-     *
-     * @return The list of families
-     */
     public List<Family> getFamilies() {
         return new ArrayList<>(families);
     }
 
-    /**
-     * Adds a new family with randomly generated attributes.
-     *
-     * @return The newly created family
-     */
     public Family addFamily() {
         Family family = new Family(random);
         families.add(family);
         return family;
     }
 
-    /**
-     * Removes the specified number of families.
-     *
-     * @param count The number of families to remove
-     * @return The actual number of families removed
-     */
     public int removeFamilies(int count) {
         int actualCount = Math.min(count, families.size());
         for (int i = 0; i < actualCount; i++) {
@@ -118,25 +89,5 @@ public class FamilyManager {
             return 0;
         }
         return getTotalIncome() / families.size();
-    }
-
-    /**
-     * Sets the random seed for reproducible results (used in tests).
-     *
-     * @param seed The random seed
-     */
-    public void setRandomSeed(long seed) {
-        this.random = new Random(seed);
-    }
-
-    /**
-     * Setter for familiesCount - used by Jackson during deserialization.
-     * This method is only here to support loading older save files and doesn't actually do anything.
-     *
-     * @param count The number of families (ignored)
-     */
-    public void setFamiliesCount(int count) {
-        // Do nothing - this is just to support deserialization of older save files
-        // The actual count is determined by the size of the families list
     }
 }

@@ -48,7 +48,7 @@ public class GameConfig {
     private static final double DEFAULT_VAT_RATE = 0.05;
     private static final long DEFAULT_TICK_INTERVAL_MS = 1000; // 1 second
     private static final String DEFAULT_DIFFICULTY = "NORMAL";
-    private static final boolean DEFAULT_SANDBOX_MODE = true;
+    private static final boolean DEFAULT_SANDBOX_MODE = false;
     private static final int SANDBOX_INITIAL_FAMILIES = 20;
     private static final int SANDBOX_INITIAL_BUDGET = 10000;
     // Maximum number of days for a game

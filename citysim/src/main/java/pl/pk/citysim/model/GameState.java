@@ -2,8 +2,14 @@ package pl.pk.citysim.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,13 +27,73 @@ import java.time.format.DateTimeFormatter;
  */
 public class GameState {
     private static final Logger logger = LoggerFactory.getLogger(GameState.class);
-    private static final ObjectMapper mapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .enable(SerializationFeature.INDENT_OUTPUT)
-            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private static final ObjectMapper mapper = createObjectMapper();
 
     // Default saves directory path, can be overridden in tests
     private static String SAVES_DIR = "saves";
+
+    /**
+     * Creates and configures an ObjectMapper for JSON serialization/deserialization.
+     * 
+     * @return A configured ObjectMapper
+     */
+    private static ObjectMapper createObjectMapper() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+        objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        // Register a custom deserializer for the Building class
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(Building.class, new BuildingDeserializer());
+        objectMapper.registerModule(module);
+
+        return objectMapper;
+    }
+
+    /**
+     * Custom deserializer for Building class that can determine the concrete subclass
+     * based on the building's name.
+     */
+    private static class BuildingDeserializer extends JsonDeserializer<Building> {
+        @Override
+        public Building deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            JsonNode node = p.getCodec().readTree(p);
+
+            // Get the building ID and name
+            int id = node.has("id") ? node.get("id").asInt() : 0;
+            String name = node.has("name") ? node.get("name").asText() : "";
+
+            // Create the appropriate building type based on the name
+            Building building = null;
+            if (name.equals("Residential")) {
+                building = new ResidentialBuilding(id);
+            } else if (name.equals("Commercial")) {
+                building = new CommercialBuilding(id);
+            } else if (name.equals("Industrial")) {
+                building = new IndustrialBuilding(id);
+            } else if (name.equals("School")) {
+                building = new SchoolBuilding(id);
+            } else if (name.equals("Hospital")) {
+                building = new HospitalBuilding(id);
+            } else if (name.equals("Park")) {
+                building = new ParkBuilding(id);
+            } else if (name.equals("Water Plant")) {
+                building = new WaterPlantBuilding(id);
+            } else if (name.equals("Power Plant")) {
+                building = new PowerPlantBuilding(id);
+            } else {
+                throw new IOException("Unknown building type: " + name);
+            }
+
+            // Set the occupancy if available
+            if (node.has("occupancy")) {
+                building.setOccupancy(node.get("occupancy").asInt());
+            }
+
+            return building;
+        }
+    }
 
     private final City city;
     private final LocalDateTime savedAt;
