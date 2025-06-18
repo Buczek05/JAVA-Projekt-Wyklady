@@ -15,9 +15,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Represents a highscore entry in the game.
- */
+// Represents a highscore entry
 public class Highscore implements Comparable<Highscore> {
     // Default highscores directory path
     private static final String HIGHSCORES_FILE = "highscores.txt";
@@ -33,16 +31,6 @@ public class Highscore implements Comparable<Highscore> {
     private final int satisfaction;
     private final int days;
 
-    /**
-     * Creates a new highscore entry.
-     *
-     * @param cityName The name of the city
-     * @param score The score achieved
-     * @param families The number of families in the city
-     * @param budget The city budget
-     * @param satisfaction The city satisfaction level
-     * @param days The number of days the city survived
-     */
     public Highscore(String cityName, int score, int families, int budget, int satisfaction, int days) {
         this.cityName = cityName;
         this.score = score;
@@ -53,17 +41,6 @@ public class Highscore implements Comparable<Highscore> {
         this.achievedAt = LocalDateTime.now();
     }
 
-    /**
-     * Creates a new highscore entry with a specified achievement time.
-     *
-     * @param cityName The name of the city
-     * @param score The score achieved
-     * @param families The number of families in the city
-     * @param budget The city budget
-     * @param satisfaction The city satisfaction level
-     * @param days The number of days the city survived
-     * @param achievedAt The time when the score was achieved
-     */
     public Highscore(
             String cityName,
             int score,
@@ -81,12 +58,6 @@ public class Highscore implements Comparable<Highscore> {
         this.achievedAt = achievedAt;
     }
 
-    /**
-     * Calculates a score based on city statistics.
-     *
-     * @param city The city to calculate the score for
-     * @return A new Highscore object with the calculated score
-     */
     public static Highscore calculateScore(City city) {
         // Score formula: (families * 10) + (budget / 10) + (satisfaction * 5) + (days * 2)
         String cityName = city.getName();
@@ -100,12 +71,6 @@ public class Highscore implements Comparable<Highscore> {
         return new Highscore(cityName, score, families, budget, satisfaction, days);
     }
 
-    /**
-     * Saves a highscore to the highscores file.
-     *
-     * @param highscore The highscore to save
-     * @return true if the highscore was saved successfully, false otherwise
-     */
     public static boolean saveHighscore(Highscore highscore) {
         try {
             // Create the highscores directory if it doesn't exist
@@ -125,8 +90,6 @@ public class Highscore implements Comparable<Highscore> {
 
             // Sort by score (descending)
             Collections.sort(highscores);
-
-            // Keep only the top MAX_HIGHSCORES
             if (highscores.size() > MAX_HIGHSCORES) {
                 highscores = highscores.subList(0, MAX_HIGHSCORES);
             }
@@ -154,11 +117,6 @@ public class Highscore implements Comparable<Highscore> {
         }
     }
 
-    /**
-     * Loads all highscores from the highscores file.
-     *
-     * @return A list of highscores, sorted by score (descending)
-     */
     public static List<Highscore> loadHighscores() {
         Path highscoresDir = Paths.get(HIGHSCORES_DIR);
         File file = new File(highscoresDir.toFile(), HIGHSCORES_FILE);
@@ -207,12 +165,6 @@ public class Highscore implements Comparable<Highscore> {
         }
     }
 
-    /**
-     * Gets the rank of a score in the highscore list.
-     *
-     * @param score The score to check
-     * @return The rank (1-based) of the score, or -1 if it's not in the top MAX_HIGHSCORES
-     */
     public static int getRank(int score) {
         List<Highscore> highscores = loadHighscores();
 
@@ -238,74 +190,34 @@ public class Highscore implements Comparable<Highscore> {
     }
 
 
-    /**
-     * Gets the city name.
-     *
-     * @return The city name
-     */
     public String getCityName() {
         return cityName;
     }
 
-    /**
-     * Gets the score.
-     *
-     * @return The score
-     */
     public int getScore() {
         return score;
     }
 
-    /**
-     * Gets the time when the score was achieved.
-     *
-     * @return The achievement time
-     */
     public LocalDateTime getAchievedAt() {
         return achievedAt;
     }
 
-    /**
-     * Gets the number of families in the city.
-     *
-     * @return The number of families
-     */
     public int getFamilies() {
         return families;
     }
 
-    /**
-     * Gets the city budget.
-     *
-     * @return The budget
-     */
     public int getBudget() {
         return budget;
     }
 
-    /**
-     * Gets the city satisfaction level.
-     *
-     * @return The satisfaction level
-     */
     public int getSatisfaction() {
         return satisfaction;
     }
 
-    /**
-     * Gets the number of days the city survived.
-     *
-     * @return The number of days
-     */
     public int getDays() {
         return days;
     }
 
-    /**
-     * Gets a formatted string representation of the achievement time.
-     *
-     * @return The formatted achievement time
-     */
     public String getFormattedAchievedTime() {
         return achievedAt.format(DATE_FORMATTER);
     }

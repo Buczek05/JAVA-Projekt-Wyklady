@@ -20,9 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Service for managing the city simulation.
- */
 public class CityService {
     private static final Logger logger = Logger.getLogger(CityService.class.getName());
 
@@ -39,9 +36,6 @@ public class CityService {
             PowerPlantBuilding.class
     };
 
-    /**
-     * Creates a new city service with default configuration.
-     */
     public CityService() {
         this.config = new GameConfig();
         this.city = new City(config.getEffectiveInitialFamilies(), config.getEffectiveInitialBudget());
@@ -58,32 +52,20 @@ public class CityService {
                 modeInfo));
     }
 
-    /**
-     * Advances the city simulation by one day.
-     * 
-     * @return true if the game should continue, false if game over conditions are met
-     */
     public boolean cityTick() {
         city.nextDay();
         logger.log(Level.FINE, String.format(
                 "Day %d: %d families, %d budget, %d satisfaction", 
                 city.getDay(), city.getFamilies(), city.getBudget(), city.getSatisfaction()));
-
-        // Check for game over conditions (only if not in sandbox mode)
         if (!config.isSandboxMode()) {
-            // Day limit check - game ends after MAX_DAYS
             if (city.getDay() >= GameConfig.MAX_DAYS) {
                 logger.log(Level.INFO, String.format("Game over: Reached day limit (%d days)", GameConfig.MAX_DAYS));
                 return false;
             }
-
-            // Bankruptcy check
             if (city.getBudget() < 0) {
                 logger.log(Level.INFO, String.format("Game over: City went bankrupt with $%d debt", -city.getBudget()));
                 return false;
             }
-
-            // Population check - city is abandoned
             if (city.getFamilies() <= 0) {
                 logger.info("Game over: City has been abandoned (0 families)");
                 return false;
@@ -93,31 +75,14 @@ public class CityService {
         return true;
     }
 
-    /**
-     * Checks if the game is in sandbox mode.
-     * 
-     * @return true if the game is in sandbox mode, false otherwise
-     */
     public boolean isSandboxMode() {
         return config.isSandboxMode();
     }
 
-    /**
-     * Builds a new building of the specified type.
-     *
-     * @param buildingClass The type of building to build
-     * @return true if the building was built successfully, false otherwise
-     */
     public boolean buildBuilding(Class<? extends Building> buildingClass) {
         return buildBuildings(buildingClass, 1);
     }
 
-    /**
-     * Calculates the cost of a building with the population-based multiplier.
-     *
-     * @param buildingClass The type of building
-     * @return A BuildingCost object containing the cost and multiplier information
-     */
     public BuildingCost calculateBuildingCost(Class<? extends Building> buildingClass) {
         int baseCost;
         try {
@@ -126,12 +91,8 @@ public class CityService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to instantiate building", e);
         }
-
-        // Scale cost with population size
         int families = city.getFamilies();
         double costMultiplier = 1.0;
-
-        // Apply progressive cost scaling based on population tiers
         if (families > 200) {
             costMultiplier = 3.0; // 200% increase for very large cities
         } else if (families > 100) {
@@ -146,9 +107,6 @@ public class CityService {
         return new BuildingCost(baseCost, actualCost, costMultiplier);
     }
 
-    /**
-     * Class to hold building cost information.
-     */
     public static class BuildingCost {
         private final int baseCost;
         private final int actualCost;
@@ -173,13 +131,6 @@ public class CityService {
         }
     }
 
-    /**
-     * Builds multiple buildings of the specified type.
-     *
-     * @param buildingClass The type of building to build
-     * @param count The number of buildings to build
-     * @return true if all buildings were built successfully, false otherwise
-     */
     public boolean buildBuildings(Class<? extends Building> buildingClass, int count) {
         if (buildingClass == null) {
             logger.log(Level.WARNING, "Cannot build null building type");
@@ -209,8 +160,6 @@ public class CityService {
                     "Building cost scaled by %.1fx due to city size (%d families)", 
                     costMultiplier, city.getFamilies()));
         }
-
-        // Build all buildings
         for (int i = 0; i < count; i++) {
             Building building = city.addBuilding(buildingClass, costPerBuilding);
             logger.log(Level.INFO, String.format("Built new %s (ID: %d) at cost $%d (%.1fx multiplier)", 
@@ -220,11 +169,6 @@ public class CityService {
         return true;
     }
 
-    /**
-     * Sets the income tax rate for the city.
-     *
-     * @param taxRate The new income tax rate (0.0 to 1.0)
-     */
     public void setTaxRate(double taxRate) {
         double oldRate = city.getTaxRate();
         city.setTaxRate(taxRate);
@@ -234,11 +178,6 @@ public class CityService {
                 city.getTaxRate() * 100));
     }
 
-    /**
-     * Sets the VAT rate for the city.
-     *
-     * @param vatRate The new VAT rate (0.0 to 1.0)
-     */
     public void setVatRate(double vatRate) {
         double oldRate = city.getVatRate();
         city.setVatRate(vatRate);
@@ -248,39 +187,18 @@ public class CityService {
                 city.getVatRate() * 100));
     }
 
-    /**
-     * Gets the current city state.
-     *
-     * @return The current city
-     */
     public City getCity() {
         return city;
     }
 
-    /**
-     * Gets the game configuration.
-     *
-     * @return The game configuration
-     */
     public GameConfig getConfig() {
         return config;
     }
 
-    /**
-     * Generates a game summary for display at the end of the game.
-     * 
-     * @return A formatted string with the game summary
-     */
     public String getGameSummary() {
         StringBuilder summary = new StringBuilder();
-
-        // Create header
         summary.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("GAME SUMMARY"));
-
-        // Basic stats
         Map<String, String> stats = new HashMap<>();
-
-        // Show different stats based on whether the game ended due to reaching the day limit
         if (city.getDay() >= GameConfig.MAX_DAYS && !config.isSandboxMode()) {
             stats.put("Game Duration", GameConfig.MAX_DAYS + " days (completed)");
             stats.put("Final Population", city.getFamilies() + " families");
@@ -301,8 +219,6 @@ public class CityService {
         // Calculate score
         int score = calculateScore();
         stats.put("Final Score", String.valueOf(score));
-
-        // Get rank
         int rank = Highscore.getRank(score);
         if (rank > 0 && rank <= 10) {
             stats.put("Highscore Rank", "#" + rank);
@@ -311,8 +227,6 @@ public class CityService {
         }
 
         summary.append(pl.pk.citysim.ui.ConsoleFormatter.createKeyValueTable("FINAL STATISTICS", stats));
-
-        // Building counts
         summary.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("BUILDINGS CONSTRUCTED"));
 
         Map<String, Integer> buildingCounts = city.getBuildingCounts();
@@ -336,14 +250,10 @@ public class CityService {
         } else {
             summary.append("No buildings constructed.\n");
         }
-
-        // Notable events
         summary.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("NOTABLE EVENTS"));
 
         List<String> allEvents = city.getEventLog();
         List<String> notableEvents = new ArrayList<>();
-
-        // Filter for notable events (fires, epidemics, economic crises, grants)
         for (String event : allEvents) {
             if (event.contains("FIRE") || event.contains("EPIDEMIC") || 
                 event.contains("ECONOMIC CRISIS") || event.contains("GRANT") ||
@@ -353,7 +263,6 @@ public class CityService {
         }
 
         if (!notableEvents.isEmpty()) {
-            // Show up to 10 notable events
             int eventsToShow = Math.min(10, notableEvents.size());
             for (int i = 0; i < eventsToShow; i++) {
                 summary.append(pl.pk.citysim.ui.ConsoleFormatter.formatLogEntry(notableEvents.get(i))).append("\n");
@@ -371,15 +280,8 @@ public class CityService {
         return summary.toString();
     }
 
-    /**
-     * Calculates the score for the current game.
-     * The primary objective is to maximize population (families) within 100 days.
-     * 
-     * @return The calculated score
-     */
     public int calculateScore() {
         // Score formula: (families * 50) + (budget / 20) + (satisfaction * 2)
-        // Population (families) is now the primary success metric with a much higher weight
         int families = city.getFamilies();
         int budget = city.getBudget();
         int satisfaction = city.getSatisfaction();
@@ -387,11 +289,6 @@ public class CityService {
         return (families * 50) + (budget / 20) + (satisfaction * 2);
     }
 
-    /**
-     * Saves the current game score to the highscores file.
-     * 
-     * @return true if the score was saved successfully, false otherwise
-     */
     public boolean saveHighscore() {
         // Don't save highscores in sandbox mode
         if (config.isSandboxMode()) {
@@ -402,15 +299,8 @@ public class CityService {
         return Highscore.saveHighscore(highscore);
     }
 
-    /**
-     * Gets a string representation of the city statistics.
-     *
-     * @return A string with city statistics
-     */
     public String getCityStats() {
         StringBuilder stats = new StringBuilder();
-
-        // Basic city info
         Map<String, String> cityInfo = new HashMap<>();
         cityInfo.put("Day", String.valueOf(city.getDay()));
         cityInfo.put("Population", city.getFamilies() + " families");
@@ -418,23 +308,17 @@ public class CityService {
         cityInfo.put("Satisfaction", city.getSatisfaction() + "%");
 
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createKeyValueTable("CITY STATS", cityInfo));
-
-        // Income and expenses info
         Map<String, String> financialInfo = new HashMap<>();
         financialInfo.put("Daily Income", "$" + city.getDailyIncome());
         financialInfo.put("Daily Expenses", "$" + city.getDailyExpenses());
         financialInfo.put("Net Daily Profit/Loss", "$" + (city.getDailyIncome() - city.getDailyExpenses()));
 
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createKeyValueTable("FINANCIAL INFO", financialInfo));
-
-        // Tax information
         Map<String, String> taxInfo = new HashMap<>();
         taxInfo.put("Income Tax", String.format("%.1f%%", city.getTaxRate() * 100));
         taxInfo.put("VAT", String.format("%.1f%%", city.getVatRate() * 100));
 
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createKeyValueTable("TAXES", taxInfo));
-
-        // Building counts
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("BUILDINGS"));
 
         Map<String, Integer> buildingCounts = city.getBuildingCounts();
@@ -453,7 +337,6 @@ public class CityService {
                     });
                 }
             } catch (Exception e) {
-                // ignore
             }
         }
 
@@ -465,8 +348,6 @@ public class CityService {
         } else {
             stats.append("No buildings constructed yet.\n");
         }
-
-        // Calculate capacities
         int residentialCapacity = 0;
         int commercialCapacity = 0;
         int industrialCapacity = 0;
@@ -492,38 +373,22 @@ public class CityService {
                 powerCapacity += building.getUtilityCapacity();
             }
         }
-
-        // Capacity information
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("CAPACITIES"));
         List<String[]> capacityRows = new ArrayList<>();
-
-        // Housing capacity
         int families = city.getFamilies();
         int housingUsed = Math.min(families, residentialCapacity);
         double housingRatio = residentialCapacity > 0 ? (double) housingUsed / residentialCapacity : 0;
         String housingStatus = getCapacityStatus(housingRatio);
-
-        // Jobs capacity
         int totalJobs = commercialCapacity + industrialCapacity;
         String jobsStatus = totalJobs >= families ? "" : pl.pk.citysim.ui.ConsoleFormatter.highlightWarning("[SHORTAGE]");
-
-        // Education capacity
         double educationRatio = families > 0 ? (double) educationCapacity / families : 1.0;
         String educationStatus = getCapacityStatus(educationRatio);
-
-        // Healthcare capacity
         double healthcareRatio = families > 0 ? (double) healthcareCapacity / families : 1.0;
         String healthcareStatus = getCapacityStatus(healthcareRatio);
-
-        // Water capacity
         double waterRatio = families > 0 ? (double) waterCapacity / families : 1.0;
         String waterStatus = getCapacityStatus(waterRatio);
-
-        // Power capacity
         double powerRatio = families > 0 ? (double) powerCapacity / families : 1.0;
         String powerStatus = getCapacityStatus(powerRatio);
-
-        // Add capacity rows
         capacityRows.add(new String[]{
             "Housing", 
             String.format("%d/%d families", housingUsed, residentialCapacity),
@@ -570,8 +435,6 @@ public class CityService {
             new String[]{"Service", "Capacity", "Coverage", "Status"}, 
             capacityRows
         ));
-
-        // Recent events
         stats.append(pl.pk.citysim.ui.ConsoleFormatter.createHeader("RECENT EVENTS"));
         List<String> recentEvents = city.getRecentEvents();
         if (recentEvents.isEmpty()) {
@@ -588,12 +451,6 @@ public class CityService {
         return stats.toString();
     }
 
-    /**
-     * Formats a status indicator for display, with appropriate highlighting.
-     *
-     * @param status The status indicator
-     * @return The formatted status for display
-     */
     private String formatStatusForDisplay(String status) {
         if (status.contains("OPTIMAL") || status.contains("GOOD")) {
             return pl.pk.citysim.ui.ConsoleFormatter.highlightSuccess(status);
@@ -608,12 +465,6 @@ public class CityService {
     }
 
 
-    /**
-     * Gets a status indicator for a capacity ratio.
-     *
-     * @param ratio The capacity ratio (0.0 to 1.0)
-     * @return A status indicator string
-     */
     private String getCapacityStatus(double ratio) {
         if (ratio >= 1.0) {
             return "[OPTIMAL]";

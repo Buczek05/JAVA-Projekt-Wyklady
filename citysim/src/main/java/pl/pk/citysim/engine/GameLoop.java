@@ -5,10 +5,6 @@ import java.util.logging.Level;
 import pl.pk.citysim.model.GameConfig;
 import pl.pk.citysim.service.CityService;
 import pl.pk.citysim.ui.ConsoleUi;
-
-/**
- * Game loop that advances the city simulation in a linear fashion.
- */
 public class GameLoop {
     private static final Logger logger = Logger.getLogger(GameLoop.class.getName());
 
@@ -17,12 +13,6 @@ public class GameLoop {
     private final GameConfig config;
     private boolean running;
 
-    /**
-     * Creates a new game loop.
-     *
-     * @param cityService The city service to use for simulation updates
-     * @param consoleUi The console UI for user interaction
-     */
     public GameLoop(CityService cityService, ConsoleUi consoleUi) {
         this.cityService = cityService;
         this.consoleUi = consoleUi;
@@ -30,24 +20,14 @@ public class GameLoop {
         this.running = false;
     }
 
-    /**
-     * Starts the game loop.
-     */
     public void start() {
         if (!running) {
             running = true;
             logger.log(Level.INFO, "Starting linear game loop");
-
-            // Start the UI directly (no separate thread)
             consoleUi.start();
         }
     }
 
-    /**
-     * Performs a single tick of the game loop.
-     * 
-     * @return true if the game should continue, false if game over
-     */
     public boolean tick() {
         try {
             if (running) {
