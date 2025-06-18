@@ -14,10 +14,6 @@ import java.util.Scanner;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Console user interface for the city simulation game.
- * Linear implementation without threads.
- */
 public class ConsoleUi {
     private static final Logger logger = Logger.getLogger(ConsoleUi.class.getName());
     private static final int MAX_HIGHSCORES = 10; // Same value as in Highscore class
@@ -40,12 +36,6 @@ public class ConsoleUi {
     private boolean running;
     private boolean waitingForCityName;
 
-    /**
-     * Creates a new console UI.
-     *
-     * @param cityService The city service to use for game actions
-     * @param gameLoop The game loop to use for pausing/resuming the game
-     */
     public ConsoleUi(CityService cityService, GameLoop gameLoop) {
         this.cityService = cityService;
         this.gameLoop = gameLoop;
@@ -54,15 +44,10 @@ public class ConsoleUi {
         this.waitingForCityName = true; // Start by waiting for city name
     }
 
-    /**
-     * Starts the console UI.
-     */
     public void start() {
         if (!running) {
             running = true;
             System.out.println("Welcome to CitySim!");
-
-            // Ask for city name
             if (waitingForCityName) {
                 System.out.println("Please enter a name for your city:");
                 System.out.print("> ");
@@ -75,8 +60,6 @@ public class ConsoleUi {
                 System.out.println("City name set to: " + cityName);
                 System.out.println();
             }
-
-            // Display game objective
             if (!cityService.isSandboxMode()) {
                 System.out.println(ConsoleFormatter.highlightSuccess(
                     "OBJECTIVE: Achieve the highest population possible within " + 
@@ -87,7 +70,6 @@ public class ConsoleUi {
             }
 
             System.out.println("Available commands:");
-            // Show sandbox mode indicator if applicable
             if (cityService.isSandboxMode()) {
                 System.out.println(ConsoleFormatter.highlightInfo("SANDBOX MODE ACTIVE - No game over conditions, no highscores"));
                 System.out.println();
@@ -103,11 +85,7 @@ public class ConsoleUi {
             System.out.println();
             System.out.println(ConsoleFormatter.highlightInfo("Type 'continue' to advance to the next day."));
             System.out.println();
-
-            // Display initial city stats
             System.out.println(cityService.getCityStats());
-
-            // Main input loop
             while (running) {
                 System.out.print("> ");
                 String input = scanner.nextLine().trim();
@@ -115,10 +93,8 @@ public class ConsoleUi {
                 if (input.equalsIgnoreCase("continue") || input.equalsIgnoreCase("c") || 
                     input.equalsIgnoreCase("run") || input.equalsIgnoreCase("r") || 
                     input.equalsIgnoreCase("resume")) {
-                    // Advance the game by one day
                     boolean continueGame = gameLoop.tick();
                     if (!continueGame) {
-                        // Game over condition met
                         break;
                     }
                 } else if (!input.isEmpty()) {
@@ -132,53 +108,11 @@ public class ConsoleUi {
             }
         }
     }
-
-    /**
-     * This method has been removed as it's not needed in the linear implementation.
-     * The game now pauses after each day automatically and waits for user input.
-     */
-
-    /**
-     * Stops the console UI.
-     */
     public void stop() {
         running = false;
         System.out.println("Console UI stopped.");
     }
 
-    /**
-     * Clears the console screen.
-     * Uses ANSI escape codes if supported, otherwise falls back to printing newlines.
-     */
-    private void clearConsole() {
-        try {
-            // Check if ANSI is supported (most modern terminals)
-            String os = System.getProperty("os.name").toLowerCase();
-
-            if (ConsoleFormatter.areColorsEnabled()) {
-                // If colors are enabled, assume ANSI is supported
-                // ANSI escape code to clear screen and move cursor to top-left
-                System.out.print("\033[H\033[2J");
-                System.out.flush();
-            } else if (os.contains("win")) {
-                // On Windows without ANSI support, use cls command
-                new ProcessBuilder("cmd", "/c", "cls").inheritIO().start().waitFor();
-            } else {
-                // Fallback to printing newlines
-                System.out.print("\n".repeat(100));
-            }
-        } catch (Exception e) {
-            // Fallback to printing newlines if any error occurs
-            System.out.print("\n".repeat(100));
-        }
-    }
-
-
-    /**
-     * Processes a command from user input.
-     *
-     * @param input The user input to process
-     */
     private void processCommand(String input) {
 
         String[] parts = input.split("\\s+", 2);
@@ -196,8 +130,6 @@ public class ConsoleUi {
                     String[] buildParts = parts[1].split("\\s+", 2);
                     String buildingTypeName = buildParts[0].toUpperCase();
                     int count = 1; // Default to building one
-
-                    // Check if count is specified
                     if (buildParts.length > 1) {
                         try {
                             count = Integer.parseInt(buildParts[1]);
@@ -228,7 +160,6 @@ public class ConsoleUi {
                     try {
                         CityService.BuildingCost buildingCost = cityService.calculateBuildingCost(buildingClass);
                         if (success) {
-                            // Get the building cost information
                             int baseCost = buildingCost.getBaseCost();
                             int actualCost = buildingCost.getActualCost();
                             double multiplier = buildingCost.getMultiplier();
@@ -241,8 +172,6 @@ public class ConsoleUi {
                                 System.out.println(ConsoleFormatter.highlightSuccess(
                                     "SUCCESS: Built " + count + " new " + typeName + " buildings"));
                             }
-
-                            // Show base cost and actual cost with multiplier
                             System.out.println("Base cost per building: $" + baseCost);
                             if (multiplier > 1.0) {
                                 System.out.println("Actual cost per building: $" + actualCost + 
@@ -257,7 +186,6 @@ public class ConsoleUi {
                                 System.out.println("Total daily upkeep: $" + (newInstance(buildingClass).getUpkeep() * count));
                             }
                         } else {
-                            // Use the building cost information already calculated
                             int actualCost = buildingCost.getActualCost();
                             double multiplier = buildingCost.getMultiplier();
 
@@ -385,7 +313,6 @@ public class ConsoleUi {
 
             case "resume":
             case "continue":
-                // These commands are now handled in the main input loop
                 System.out.println(ConsoleFormatter.highlightInfo("Type 'continue', 'c', 'run', 'r', or 'resume' to advance to the next day."));
                 break;
 
@@ -398,20 +325,11 @@ public class ConsoleUi {
         }
     }
 
-
-    /**
-     * Displays help information about commands.
-     *
-     * @param command The specific command to show help for, or null for general help
-     */
     private void displayHelp(String command) {
         if (command == null) {
-            // General help
             System.out.println(ConsoleFormatter.createHeader("CITYSIM HELP"));
             System.out.println("Available commands:");
             System.out.println();
-
-            // Show sandbox mode indicator if applicable
             if (cityService.isSandboxMode()) {
                 System.out.println(ConsoleFormatter.highlightInfo("SANDBOX MODE ACTIVE - No game over conditions, no highscores"));
                 System.out.println();
@@ -438,7 +356,6 @@ public class ConsoleUi {
 
             System.out.println("Type 'help <command>' for more information about a specific command.");
         } else {
-            // Command-specific help
             switch (command) {
                 case "build":
                     System.out.println(ConsoleFormatter.createHeader("BUILD COMMAND HELP"));
@@ -580,16 +497,7 @@ public class ConsoleUi {
         }
     }
 
-    /**
-     * This method has been removed as it's not needed in the linear implementation.
-     * Commands are processed directly in the main input loop.
-     */
 
-    /**
-     * Gets an array of building type names.
-     *
-     * @return Array of building type names
-     */
     private String[] getBuildingTypeNames() {
         return BUILDING_MAP.keySet().toArray(new String[0]);
     }
@@ -602,9 +510,6 @@ public class ConsoleUi {
         }
     }
 
-    /**
-     * Displays the highscore table.
-     */
     private void displayHighscores() {
         System.out.println(ConsoleFormatter.createHeader("HIGHSCORE TABLE"));
 
@@ -655,15 +560,9 @@ public class ConsoleUi {
     }
 
 
-    /**
-     * Waits for the user to press the space key to continue the game.
-     * Displays the current city stats and a prompt.
-     * In the linear implementation, this is called directly from the game loop.
-     */
     public void waitForSignalToContinue() {
         System.out.println(cityService.getCityStats());
         cityService.saveHighscore();
-        // Show progress towards objective if not in sandbox mode
         if (!cityService.isSandboxMode()) {
             int currentDay = cityService.getCity().getDay();
             int daysRemaining = GameConfig.MAX_DAYS - currentDay;
@@ -678,30 +577,18 @@ public class ConsoleUi {
             System.out.println(ConsoleFormatter.highlightInfo(
                 "Day " + cityService.getCity().getDay() + " completed. Type 'continue', 'c', 'run', 'r', or 'resume' to advance to the next day..."));
         }
-
-        // In the linear implementation, we don't need to wait for a key press here
-        // The main input loop in the start() method will handle this
     }
 
-    /**
-     * Handles game over conditions.
-     * Displays a game summary and prompts for a player name for the highscore table.
-     * In the linear implementation, this is called directly from the game loop.
-     */
     public void handleGameOver() {
-        // Check if game ended due to reaching day limit
         if (cityService.getCity().getDay() >= GameConfig.MAX_DAYS && !cityService.isSandboxMode()) {
             System.out.println(ConsoleFormatter.highlightSuccess("GAME COMPLETED!"));
             System.out.println("You've reached day " + GameConfig.MAX_DAYS + " with a population of " + 
                 cityService.getCity().getFamilies() + " families!");
         } else {
-            // Display standard game over message for other end conditions
             System.out.println(ConsoleFormatter.highlightError("GAME OVER!"));
         }
 
         System.out.println(cityService.getGameSummary());
-
-        // Only prompt for name if not in sandbox mode
         if (!cityService.isSandboxMode()) {
             int score = cityService.calculateScore();
             int rank = Highscore.getRank(score);

@@ -9,16 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-/**
- * Configuration for the city simulation game.
- * Loads settings from config.yml or uses defaults if the file is not found.
- */
 public class GameConfig {
     private static final Logger logger = Logger.getLogger(GameConfig.class.getName());
 
-    /**
-     * Enum representing different difficulty levels for the game.
-     */
     public enum Difficulty {
         EASY(1.2, 0.8),
         NORMAL(1.0, 1.0),
@@ -40,8 +33,6 @@ public class GameConfig {
             return expenseMultiplier;
         }
     }
-
-    // Default values
     private static final int DEFAULT_INITIAL_FAMILIES = 10;
     private static final int DEFAULT_INITIAL_BUDGET = 1000;
     private static final double DEFAULT_INCOME_TAX_RATE = 0.10;
@@ -51,10 +42,7 @@ public class GameConfig {
     private static final boolean DEFAULT_SANDBOX_MODE = false;
     private static final int SANDBOX_INITIAL_FAMILIES = 20;
     private static final int SANDBOX_INITIAL_BUDGET = 10000;
-    // Maximum number of days for a game
     public static final int MAX_DAYS = 100;
-
-    // Configuration properties
     private final int initialFamilies;
     private final int initialBudget;
     private final double initialTaxRate;
@@ -63,13 +51,8 @@ public class GameConfig {
     private final Difficulty difficulty;
     private final boolean sandboxMode;
 
-    /**
-     * Creates a new GameConfig by loading from config.yml or using defaults.
-     */
     public GameConfig() {
         Properties props = new Properties();
-
-        // Try to load from config.yml
         File configFile = new File("config.yml");
         if (configFile.exists()) {
             try (InputStream input = new FileInputStream(configFile)) {
@@ -81,8 +64,6 @@ public class GameConfig {
         } else {
             logger.log(Level.INFO, "config.yml not found, using default configuration");
         }
-
-        // Load properties with defaults
         this.initialFamilies = Integer.parseInt(
                 props.getProperty("initialFamilies", String.valueOf(DEFAULT_INITIAL_FAMILIES)));
         this.initialBudget = Integer.parseInt(
@@ -93,12 +74,8 @@ public class GameConfig {
                 props.getProperty("initialVatRate", String.valueOf(DEFAULT_VAT_RATE)));
         this.tickIntervalMs = Long.parseLong(
                 props.getProperty("tickIntervalMs", String.valueOf(DEFAULT_TICK_INTERVAL_MS)));
-
-        // Load difficulty setting
         String difficultyStr = props.getProperty("difficulty", DEFAULT_DIFFICULTY);
         this.difficulty = Difficulty.valueOf(difficultyStr.toUpperCase());
-
-        // Load sandbox mode setting
         this.sandboxMode = Boolean.parseBoolean(props.getProperty("sandboxMode", String.valueOf(DEFAULT_SANDBOX_MODE)));
     }
 

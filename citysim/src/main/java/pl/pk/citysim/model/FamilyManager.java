@@ -1,7 +1,3 @@
-/**
- * Manages the families in the city simulation.
- * This class is responsible for creating, updating, and managing Family objects.
- */
 package pl.pk.citysim.model;
 
 import java.util.ArrayList;
@@ -20,8 +16,6 @@ public class FamilyManager {
     public FamilyManager(int initialFamilies) {
         this.families = new ArrayList<>();
         this.random = new Random();
-
-        // Create initial families
         for (int i = 0; i < initialFamilies; i++) {
             addFamily();
         }
@@ -49,15 +43,6 @@ public class FamilyManager {
         return actualCount;
     }
 
-    /**
-     * Updates the income of all families based on city conditions.
-     *
-     * @param jobQualityRatio The ratio of commercial to total jobs (higher is better)
-     * @param jobRatio The ratio of available jobs to families (1.0 means enough jobs)
-     * @param educationRatio The ratio of education capacity to families (1.0 means enough education)
-     * @param difficultyScaling The difficulty scaling factor
-     * @return The total income of all families
-     */
     public int updateFamilyIncomes(double jobQualityRatio, double jobRatio, double educationRatio, double difficultyScaling) {
         int totalIncome = 0;
         for (Family family : families) {
@@ -66,11 +51,6 @@ public class FamilyManager {
         return totalIncome;
     }
 
-    /**
-     * Gets the total income of all families.
-     *
-     * @return The total income
-     */
     public int getTotalIncome() {
         int totalIncome = 0;
         for (Family family : families) {
@@ -79,11 +59,6 @@ public class FamilyManager {
         return totalIncome;
     }
 
-    /**
-     * Gets the average income per family.
-     *
-     * @return The average income, or 0 if there are no families
-     */
     public int getAverageIncome() {
         if (families.isEmpty()) {
             return 0;

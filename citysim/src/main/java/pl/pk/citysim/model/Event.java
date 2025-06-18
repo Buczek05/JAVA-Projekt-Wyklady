@@ -1,8 +1,5 @@
 package pl.pk.citysim.model;
 
-/**
- * Enum representing different types of events that can occur in the city.
- */
 public enum Event {
     FIRE("Fire", "A building caught fire, causing damage and repair costs.", false),
     EPIDEMIC("Epidemic", "A disease outbreak affected families and required healthcare expenses.", false),
