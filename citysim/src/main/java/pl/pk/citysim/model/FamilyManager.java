@@ -43,10 +43,10 @@ public class FamilyManager {
         return actualCount;
     }
 
-    public int updateFamilyIncomes(double jobQualityRatio, double jobRatio, double educationRatio, double difficultyScaling) {
+    public int calculateFamilyIncomes(double jobQualityRatio, double jobRatio, double educationRatio, double difficultyScaling) {
         int totalIncome = 0;
         for (Family family : families) {
-            totalIncome += family.updateIncome(jobQualityRatio, jobRatio, educationRatio, difficultyScaling);
+            totalIncome += family.calculateIncome(jobQualityRatio, jobRatio, educationRatio, difficultyScaling);
         }
         return totalIncome;
     }

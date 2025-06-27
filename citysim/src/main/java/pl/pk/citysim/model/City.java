@@ -6,8 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import pl.pk.citysim.model.*;
-
 public class City {
     private String name;
     private int day;
@@ -449,7 +447,7 @@ public class City {
             double worstUtilityRatio = Math.min(waterRatio, powerRatio);
             eventLog.add(String.format("Day %d: Utility shortage reducing family income", day));
         }
-        familyManager.updateFamilyIncomes(jobQualityRatio, jobRatio, educationRatio, difficultyScaling);
+        familyManager.calculateFamilyIncomes(jobQualityRatio, jobRatio, educationRatio, difficultyScaling);
         int totalFamilyIncome = familyManager.getTotalIncome();
         int incomeTaxRevenue = (int) (totalFamilyIncome * taxRate);
         int averageFamilyIncome = familyManager.getAverageIncome();
@@ -676,7 +674,7 @@ public class City {
         int actualChange = updateSatisfactionValue(scaledChange);
         if (satisfaction > 80) {
             double excessSatisfaction = satisfaction - 80;
-            double diminishedExcess = excessSatisfaction * (1.0 - (excessSatisfaction / 40.0));
+            double diminishedExcess = excessSatisfaction * (1.0 - (excessSatisfaction / 80));
             int newSatisfaction = 80 + (int)diminishedExcess;
             satisfaction = newSatisfaction;
         }
